@@ -17,16 +17,17 @@ repositories {
     }
 }
 
+val graphdbVersion = "10.2.0"
+
 dependencies {
-    implementation("com.ontotext.graphdb:graphdb-sdk:10.2.0")
-    implementation("com.ontotext.graphdb:graphdb-runtime:10.2.0")
+    implementation("com.ontotext.graphdb:graphdb-sdk:$graphdbVersion")
+    implementation("com.ontotext.graphdb:graphdb-runtime:$graphdbVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect:${getKotlinPluginVersion()}")
 
     testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.9.3")
-    testImplementation("com.ontotext.graphdb:graphdb-tests-base:10.2.0")
+    testImplementation("com.ontotext.graphdb:graphdb-tests-base:$graphdbVersion")
     testImplementation(kotlin("test"))
-
 }
 
 
