@@ -11,7 +11,6 @@ import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection
 import org.junit.*
 
 
-
 class TestProofPlugin {
     private val deleteAll = """
         DELETE {?s ?p ?o} where {
@@ -55,6 +54,45 @@ class TestProofPlugin {
         }
     """.trimIndent()
 
+    private val addMary = """
+        INSERT DATA {
+            <urn:childOf> owl:inverseOf <urn:hasChild> .
+            graph <urn:family> {
+                <urn:John> <urn:childOf> <urn:Mary>
+            }
+        }
+    """.trimIndent()
+
+    private val explainMary = """
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX proof: <http://www.ontotext.com/proof/>
+        SELECT ?rule ?s ?p ?o ?context WHERE {
+            VALUES (?subject ?predicate ?object) {(<urn:Mary> <urn:hasChild> <urn:John>)}
+            ?ctx proof:explain (?subject ?predicate ?object) .
+            ?ctx proof:rule ?rule .
+            ?ctx proof:subject ?s .
+            ?ctx proof:predicate ?p .
+            ?ctx proof:object ?o .
+            ?ctx proof:context ?context .
+        }
+    """.trimIndent()
+
+    private val explainMaryExplicit = """
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX proof: <http://www.ontotext.com/proof/>
+        SELECT ?rule ?s ?p ?o ?context WHERE {
+            VALUES (?subject ?predicate ?object) {(<urn:John> <urn:childOf> <urn:Mary>)}
+            ?ctx proof:explain (?subject ?predicate ?object) .
+            ?ctx proof:rule ?rule .
+            ?ctx proof:subject ?s .
+            ?ctx proof:predicate ?p .
+            ?ctx proof:object ?o .
+            ?ctx proof:context ?context .
+        }
+    """.trimIndent()
+
 
     @Before
     fun removeAllTriples() {
@@ -63,7 +101,7 @@ class TestProofPlugin {
 
 
     @Test
-    fun checkLessieIsADog() {
+    fun `Lessie is a dog is inserted correctly`() {
         connection.prepareUpdate(addLessie).execute()
         val explainResult = connection.prepareTupleQuery(selectLassieIsDog).evaluate()
         explainResult.use {
@@ -81,7 +119,7 @@ class TestProofPlugin {
     }
 
     @Test
-    fun explainLessieIsAMammal() {
+    fun `Lessie is a mammal has the right antecedents`() {
         connection.prepareUpdate(addLessie).execute()
         val explainResult = connection.prepareTupleQuery(explainLessie).evaluate()
         explainResult.use {
@@ -123,6 +161,66 @@ class TestProofPlugin {
 
     }
 
+    @Test
+    fun `Mary has child in named graph`() {
+        connection.prepareUpdate(addMary).execute()
+        val explainResult = connection.prepareTupleQuery(explainMary).evaluate()
+        explainResult.use { result ->
+            val resultList = result.toList()
+            assertEquals("Statement has exactly 2 antecedents", 2, resultList.count())
+
+            resultList.forEachIndexed { index, bindingSet ->
+                println("result $index")
+                bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
+            }
+
+            val bindingsMap = mapOf(
+                "rule" to "rule_prp_inv1",
+                "s" to "urn:John",
+                "p" to "urn:childOf",
+                "o" to "urn:Mary",
+                "context" to "urn:family",
+            )
+
+            val isAntecedentInNamedGraph = resultList.any { bindingSet ->
+                bindingsMap.all { (key, value) -> bindingSet.getBinding(key).value.stringValue() == value }
+            }
+
+            assertTrue("John child of mary is in context urn:family", isAntecedentInNamedGraph)
+        }
+    }
+
+    @Test
+    fun `Antecedent has explicit rule`() {
+        connection.prepareUpdate(addMary).execute()
+        val explainResult = connection.prepareTupleQuery(explainMaryExplicit).evaluate()
+        explainResult.use { result ->
+            val resultList = result.toList()
+            assertEquals("Statement has exactly 1 antecedent", 1, resultList.count())
+
+            resultList.forEachIndexed { index, bindingSet ->
+                println("result $index")
+                bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
+            }
+
+            val bindingsMap = mapOf(
+                "rule" to "explicit",
+                "s" to "urn:John",
+                "p" to "urn:childOf",
+                "o" to "urn:Mary",
+                "context" to "urn:family",
+            )
+
+            val isAntecedentExplicit = resultList.any { bindingSet ->
+                bindingsMap.all { (key, value) -> bindingSet.getBinding(key).value.stringValue() == value }
+            }
+
+            assertTrue("John child of mary is explicit", isAntecedentExplicit)
+        }
+
+    }
+
+
     companion object {
 
         private lateinit var repository: SailRepository
@@ -133,32 +231,18 @@ class TestProofPlugin {
         @ClassRule
         val tmpFolder = TemporaryLocalFolder()
 
-
-        @JvmStatic
-        @BeforeClass
-        fun setWorkDir() {
-            System.setProperty("graphdb.home.work", "${tmpFolder.root}")
-            Config.reset()
-        }
-
-        @JvmStatic
-        @AfterClass
-        fun resetWorkDir() {
-            System.clearProperty("graphdb.home.work")
-            Config.reset()
-        }
-
-        @JvmStatic
-        @AfterClass
-        fun cleanUp() {
-            connection.close()
-        }
-
         @JvmStatic
         @BeforeClass
         fun setUp() {
+            setWorkDir()
             repository = getRepository()
             connection = repository.connection
+        }
+
+        @JvmStatic
+        fun setWorkDir() {
+            System.setProperty("graphdb.home.work", "${tmpFolder.root}")
+            Config.reset()
         }
 
         private fun getRepository(): SailRepository {
@@ -170,6 +254,19 @@ class TestProofPlugin {
             return SailRepository(sail).apply {
                 dataDir = tmpFolder.newFolder("proof-plugin-explain"); init()
             }
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun cleanUp() {
+            connection.close()
+            resetWorkDir()
+        }
+
+        @JvmStatic
+        fun resetWorkDir() {
+            System.clearProperty("graphdb.home.work")
+            Config.reset()
         }
 
     }
