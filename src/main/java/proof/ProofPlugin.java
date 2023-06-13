@@ -48,8 +48,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
 	public static final String NAMESPACE = "http://www.ontotext.com/proof/";
 
-	public static final String NAME = "proof";
-
 	public static final IRI EXPLAIN_URI = SimpleValueFactory.getInstance().createIRI(NAMESPACE+"explain");
 	public static final IRI RULE_URI = SimpleValueFactory.getInstance().createIRI(NAMESPACE+"rule");
 	public static final IRI SUBJ_URI = SimpleValueFactory.getInstance().createIRI(NAMESPACE+"subject");
@@ -190,8 +188,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
 	@Override
 	public String getName() {
-		// TODO Auto-generated method stub
-		return NAME;
+		return "proof-from-source";
 	}
 
 	/**

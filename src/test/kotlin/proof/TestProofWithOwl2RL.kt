@@ -28,7 +28,9 @@ class TestProofWithOwl2RL {
             assertEquals(1, resultList.count())
             println("listResult = $resultList")
 
+
             resultList.forEachIndexed { index, bindingSet ->
+                println("bindingSet to string $bindingSet")
                 println("Result $index")
                 bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
             }
@@ -139,131 +141,37 @@ class TestProofWithOwl2RL {
     }
 
     @Test
-    fun `mary is subject of 12 statements`() {
-        connection.prepareUpdate(registerJSFn).execute()
+    fun `12 antecedents for mary as subject`() {
+        connection.prepareUpdate(registerLNameFn).execute()
         connection.prepareUpdate(addMary).execute()
         val explainResult = connection.prepareTupleQuery(explainMaryInSubject).evaluate()
         explainResult.use { result ->
             val resultList = result.toList()
-            assertEquals("Query returns threes statements", 12, resultList.count())
+            assertEquals("Query returns 12 statements", 12, resultList.count())
         }
     }
 
-    private val deleteAll = """
-        DELETE {?s ?p ?o} where {
-                ?s ?p ?o .
+
+    fun `describe Merlo`() {
+        connection.prepareUpdate(addWine).execute()
+        connection.prepareUpdate(registerLNameFn).execute()
+        connection.prepareUpdate(registerStmtFn).execute()
+        connection.prepareUpdate(registerBNodeFn).execute()
+
+
+        connection.prepareGraphQuery(describeMerlo).evaluate().use { result ->
+            val resultList = result.toList()
+            println("Describe result - $resultList")
+            assertEquals("urn:Merlo describe has 6 results", 6, resultList.count())
         }
-    """.trimIndent()
 
-    private val addLessie = """
-         PREFIX : <http://www.example.com/>
-        
-         INSERT DATA {
-            :Lassie rdf:type :Dog.
-            :Dog rdfs:subClassOf :Mammal.
+        connection.prepareTupleQuery(explainMerlotTypeRedWine).evaluate().use { result ->
+            val resultList = result.toList()
+            println("Explain result - $resultList")
+            assertEquals("Merlo rdf:type redWine has 2 antecedents", 2, resultList.count())
         }
-    """.trimIndent()
+    }
 
-    private val selectLassieIsDog = """
-        PREFIX : <http://www.example.com/>
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        Select ?subject ?predicate ?object WHERE {
-          ?subject ?predicate ?object .
-          FILTER (?subject = :Lassie && ?predicate = rdf:type  && ?object = :Dog)
-        }
-    """.trimIndent()
-
-    private val explainLessie = """
-        PREFIX : <http://www.example.com/>
-        PREFIX t: <http://www.example.com/tbox/>
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        prefix proof: <http://www.ontotext.com/proof/>
-
-        select ?rule ?s ?p ?o ?context where {
-            values (?subject ?predicate ?object) {(:Lassie rdf:type :Mammal)}
-            ?ctx proof:explain (?subject ?predicate ?object) .
-            ?ctx proof:rule ?rule .
-            ?ctx proof:subject ?s .
-            ?ctx proof:predicate ?p .
-            ?ctx proof:object ?o .
-            ?ctx proof:context ?context .
-        }
-    """.trimIndent()
-
-    private val addMary = """
-        INSERT DATA {
-            <urn:childOf> owl:inverseOf <urn:hasChild> .
-            graph <urn:family> {
-                <urn:John> <urn:childOf> <urn:Mary>
-            }
-        }
-    """.trimIndent()
-
-    private val explainMary = """
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        PREFIX proof: <http://www.ontotext.com/proof/>
-        SELECT ?rule ?s ?p ?o ?context WHERE {
-            VALUES (?subject ?predicate ?object) {(<urn:Mary> <urn:hasChild> <urn:John>)}
-            ?ctx proof:explain (?subject ?predicate ?object) .
-            ?ctx proof:rule ?rule .
-            ?ctx proof:subject ?s .
-            ?ctx proof:predicate ?p .
-            ?ctx proof:object ?o .
-            ?ctx proof:context ?context .
-        }
-    """.trimIndent()
-
-    private val explainMaryExplicit = """
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        PREFIX proof: <http://www.ontotext.com/proof/>
-        SELECT ?rule ?s ?p ?o ?context WHERE {
-            VALUES (?subject ?predicate ?object) {(<urn:John> <urn:childOf> <urn:Mary>)}
-            ?ctx proof:explain (?subject ?predicate ?object) .
-            ?ctx proof:rule ?rule .
-            ?ctx proof:subject ?s .
-            ?ctx proof:predicate ?p .
-            ?ctx proof:object ?o .
-            ?ctx proof:context ?context .
-        }
-    """.trimIndent()
-
-    private val registerJSFn = """
-        PREFIX jsfn:<http://www.ontotext.com/js#>
-        INSERT DATA {
-            [] jsfn:register '''
-            function lname(value) {
-             if(value instanceof org.eclipse.rdf4j.model.IRI)
-                 return value.getLocalName();
-             else
-                 return ""+value;
-            }
-        '''
-        }
-    """.trimIndent()
-
-    private val explainMaryInSubject = """
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        PREFIX onto: <http://www.ontotext.com/>
-        prefix proof: <http://www.ontotext.com/proof/>
-        PREFIX jsfn: <http://www.ontotext.com/js#>
-        SELECT (concat('(',jsfn:lname(?subject),',',jsfn:lname(?predicate),',',jsfn:lname(?object),')') as ?stmt)
-            ?rule ?s ?p ?o ?context
-        WHERE {
-            bind(<urn:Mary> as ?subject) .
-            {?subject ?predicate ?object}
-
-            ?ctx proof:explain (?subject ?predicate ?object) .
-            ?ctx proof:rule ?rule .
-            ?ctx proof:subject ?s .
-            ?ctx proof:predicate ?p .
-            ?ctx proof:object ?o .
-            ?ctx proof:context ?context .
-        }
-    """.trimIndent()
 
     companion object {
         private lateinit var repository: SailRepository
@@ -277,7 +185,11 @@ class TestProofWithOwl2RL {
         @BeforeClass
         fun setUp() {
             setWorkDir()
-            repository = getRepository()
+            val sailParams = mapOf(
+                "register-plugins" to proof.ProofPlugin::class.qualifiedName as String,
+                "ruleset" to "owl2-rl",
+            )
+            repository = getRepository(sailParams)
             connection = repository.connection
         }
 
@@ -287,14 +199,10 @@ class TestProofWithOwl2RL {
             Config.reset()
         }
 
-        private fun getRepository(): SailRepository {
-            val sailParams = mapOf(
-                "register-plugins" to proof.ProofPlugin::class.qualifiedName as String,
-                "ruleset" to "owl2-rl",
-            )
+        private fun getRepository(sailParams: Map<String, String>): SailRepository {
             val sail = OwlimSchemaRepository().apply { setParameters(sailParams) }
             return SailRepository(sail).apply {
-                dataDir = tmpFolder.newFolder("proof-plugin-explain"); init()
+                dataDir = tmpFolder.newFolder("proof-plugin-explain-${sailParams["ruleset"]}"); init()
             }
         }
 
@@ -313,4 +221,6 @@ class TestProofWithOwl2RL {
         }
 
     }
+
+
 }
