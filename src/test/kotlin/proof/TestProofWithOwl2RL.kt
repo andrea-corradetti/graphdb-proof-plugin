@@ -187,6 +187,18 @@ class TestProofWithOwl2RL {
             assertTrue("Antecedent is in :G1", isAntecedentFromG1)
         }
 
+        connection.prepareTupleQuery(explain(":Lassie", "rdf:type", ":Mammal", ":G2")).evaluate().use {
+            val resultList = it.toList()
+            println("antecedents - $resultList")
+            assertEquals("Result has 2 antecedents", 2, resultList.count())
+
+            val isAntecedentFromG1 = resultList.any {bindingSet ->
+                bindingSet.getBinding("context").value.stringValue() == "http://www.example.com/G2"
+            }
+
+            assertTrue("Antecedent is in :G1", isAntecedentFromG1)
+        }
+
 
     }
 

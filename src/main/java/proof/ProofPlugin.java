@@ -165,7 +165,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 	 */
 	@Override
 	public RequestContext preprocess(Request request) {
-
 		return new ProofContext(request);
 
 	}
@@ -210,14 +209,15 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			return StatementIterator.EMPTY;
 		
 		if (predicate == explainId) {
-			if (objects == null || objects.length != 3)
+			if (objects == null || objects.length < 3 || objects.length > 4)
 				return StatementIterator.EMPTY;
 
-			long subj = objects[0];
-			long pred = objects[1];
-			long obj = objects[2];
+			long subjToExplain = objects[0];
+			long objToExplain = objects[1];
+			long predToExplain = objects[2];
+			long ctxToExplain = (objects.length == 4 ) ? objects[3] : 0;
 			// empty if no binding, or some of the nodes is not a regular entity
-			if (subj <= 0 || obj <= 0 || pred <= 0)
+			if (subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0)
 				return StatementIterator.EMPTY;
 			// a context if an explicit exists
 			long aContext = 0;
@@ -230,7 +230,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			boolean isExplicit = false;
 			boolean isDerivedFromSameAs = false;
 			{
-				StatementIdIterator iter = conn.getStatements(subj, pred, obj, StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS);
+				StatementIdIterator iter = conn.getStatements(subjToExplain, objToExplain, predToExplain, StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS);
 				try {
 					isExplicit = iter.hasNext();
 					aContext = iter.context;
@@ -245,7 +245,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			long reificationId = pluginConnection.getEntities().put(SimpleValueFactory.getInstance().createBNode(), Scope.REQUEST);
 			
 			// create a Task instance and pass the iterator of the statements from the target graph
-			ExplainIter ret = new ExplainIter(ctx, reificationId, subj, pred, obj, 
+			ExplainIter ret = new ExplainIter(ctx, reificationId, subjToExplain, objToExplain, predToExplain,
 					isExplicit, isDerivedFromSameAs, aContext);
 			// access the inferencers and the repository connection from systemoptions
 			ret.infer = infer;
