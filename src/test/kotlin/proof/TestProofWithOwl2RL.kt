@@ -172,6 +172,24 @@ class TestProofWithOwl2RL {
         }
     }
 
+    @Test
+    fun `Lassie has antecedents in correct named graph`() {
+        connection.prepareUpdate(insertLassieNg).execute()
+        connection.prepareTupleQuery(explain(":Lassie", "rdf:type", ":Mammal", ":G1")).evaluate().use {
+            val resultList = it.toList()
+            println("antecedents - $resultList")
+            assertEquals("Result has 2 antecedents", 2, resultList.count())
+
+            val isAntecedentFromG1 = resultList.any {bindingSet ->
+                bindingSet.getBinding("context").value.stringValue() == "http://www.example.com/G1"
+            }
+
+            assertTrue("Antecedent is in :G1", isAntecedentFromG1)
+        }
+
+
+    }
+
 
     companion object {
         private lateinit var repository: SailRepository

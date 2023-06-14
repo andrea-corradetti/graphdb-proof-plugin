@@ -175,33 +175,70 @@ internal val registerBNodeFn = """
 """.trimIndent()
 
 internal val explainMerlotTypeRedWine = """
-PREFIX jsfn:<http://www.ontotext.com/js#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-prefix proof: <http://www.ontotext.com/proof/>
-SELECT ?rule ?s ?p ?o ?context
-WHERE {
-    {
-            VALUES (?subject ?predicate ?object) {
-                    (<urn:Merlo> rdf:type <urn:RedWine>)
-            }
-
+    PREFIX jsfn:<http://www.ontotext.com/js#>
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+    prefix proof: <http://www.ontotext.com/proof/>
+    SELECT ?rule ?s ?p ?o ?context
+    WHERE {
+        {
+                VALUES (?subject ?predicate ?object) {
+                        (<urn:Merlo> rdf:type <urn:RedWine>)
+                }
+    
+        }
+        ?ctx proof:explain (?subject ?predicate ?object) .
+        ?ctx proof:rule ?rule .
+        ?ctx proof:subject ?s .
+        ?ctx proof:predicate ?p .
+        ?ctx proof:object ?o .
+        ?ctx proof:context ?context .
     }
-    ?ctx proof:explain (?subject ?predicate ?object) .
-    ?ctx proof:rule ?rule .
-    ?ctx proof:subject ?s .
-    ?ctx proof:predicate ?p .
-    ?ctx proof:object ?o .
-    ?ctx proof:context ?context .
-}
 """.trimIndent()
 
 internal val describeMerlo = "DESCRIBE <urn:Merlo> "
 
-internal
-val registeredFns = """
-            PREFIX jsfn:<http://www.ontotext.com/js#>
-            SELECT ?s ?o {
-                ?s jsfn:enum ?o
-            }
-        """.trimIndent()
+internal val registeredFns = """
+    PREFIX jsfn:<http://www.ontotext.com/js#>
+    SELECT ?s ?o {
+        ?s jsfn:enum ?o
+    }
+""".trimIndent()
+
+internal val insertLassieNg = """
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+    PREFIX : <http://www.example.com/>
+    PREFIX t: <http://www.example.com/tbox/>
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    
+    INSERT DATA {
+    graph :G1 {
+        :Lassie rdf:type :Dog.        
+    }
+    
+    graph :G2 {
+        :Lassie rdf:type :Dog.        
+    }
+
+        :Dog rdfs:subClassOf :Mammal.
+    }
+
+""".trimIndent()
+
+internal fun explain(subject: String, predicate: String, `object`: String, context: String = "") = """
+        PREFIX : <http://www.example.com/>
+        PREFIX t: <http://www.example.com/tbox/>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        prefix proof: <http://www.ontotext.com/proof/>
+        SELECT ?rule ?s ?p ?o ?context WHERE {
+            VALUES (?subject ?predicate ?object) {($subject $predicate $`object`)}
+            ?ctx proof:explain (?subject ?predicate ?object $context) .
+            ?ctx proof:rule ?rule .
+            ?ctx proof:subject ?s .
+            ?ctx proof:predicate ?p .
+            ?ctx proof:object ?o .
+            ?ctx proof:context ?context .
+        }
+""".trimIndent()
