@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 
 /**
@@ -42,9 +41,7 @@ import java.util.Iterator;
 public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPlugin, Preprocessor, PatternInterpreter, ListPatternInterpreter {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 	// private key to store the connection in the request context
-	private static final String REPOSITORY_CONNECTION = "repconn";
-	// private key to store the inferencer in the request context
-	private static final String INFERENCER = "infer";
+
 
 	public static final String NAMESPACE = "http://www.ontotext.com/proof/";
 
@@ -66,35 +63,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 	long objId = 0;
 	long contextId = 0;
 
-	/**
-	 * this is the context implementation where the plugin stores currently running patterns
-	 * it just keeps some values using sting keys for further access
-	 *
-	 */
-	class ContextImpl implements RequestContext {
-		HashMap<String, Object> map = new HashMap<String, Object>();
-		Request request;
-		@Override
-		public Request getRequest() {
-			return request;
-		}
-
-		@Override
-		public void setRequest(Request request) {
-			this.request = request;
-		}
-
-		public Object getAttribute(String key) {
-			return map.get(key); 
-		}
-		public void setAttribute(String key, Object value) {
-			map.put(key, value); 
-		}
-		public void removeAttribute(String key) {
-			map.remove(key);
-		}
-	}
-
 	/*
 	 * main entry for predicate resolution of the ProvenancePlugin
 	 * 
@@ -111,7 +79,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
 		// make sure we have the proper request context set when preprocess() has been invoked
 		// if not return EMPTY
-		ContextImpl ctx = (requestContext instanceof ContextImpl)?(ContextImpl)requestContext:null;
+		ProofContext ctx = (requestContext instanceof ProofContext)?(ProofContext)requestContext:null;
 
 		// not our context
 		if (ctx == null)
@@ -197,26 +165,9 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 	 */
 	@Override
 	public RequestContext preprocess(Request request) {
-		// create a context instance
-		ContextImpl impl = new ContextImpl(); 
-		impl.setRequest(request);
-		// check if there is a valid request and it has options
-		if (request != null ) {
-			RequestOptions ops = request.getOptions();
-			if (ops != null && ops instanceof SystemPluginOptions) {
-				// retrieve the inferencer from the systemPluginOptions instance 
-				Object obj = ((SystemPluginOptions)ops).getOption(Option.ACCESS_INFERENCER);
-				if (obj instanceof AbstractInferencer) {
-					impl.setAttribute(INFERENCER, obj);
-				}
-				// retrieve the repository connection from the systemPluginOptions instance 
-				obj = ((SystemPluginOptions)ops).getOption(Option.ACCESS_REPOSITORY_CONNECTION);
-				if (obj instanceof AbstractRepositoryConnection) {
-					impl.setAttribute(REPOSITORY_CONNECTION, obj);
-				}
-			}
-		}
-		return impl;
+
+		return new ProofContext(request);
+
 	}
 	
 	/**
@@ -252,7 +203,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
             PluginConnection pluginConnection, RequestContext requestContext) {
 		// make sure we have the proper request context set when preprocess() has been invoked
 		// if not return EMPTY
-		ContextImpl ctx = (requestContext instanceof ContextImpl)?(ContextImpl)requestContext:null;
+		ProofContext ctx = (requestContext instanceof ProofContext)?(ProofContext)requestContext:null;
 
 		// not our context
 		if (ctx == null)
@@ -270,12 +221,12 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 				return StatementIterator.EMPTY;
 			// a context if an explicit exists
 			long aContext = 0;
-			AbstractInferencer infer = (AbstractInferencer)ctx.getAttribute(INFERENCER);
+			AbstractInferencer infer = (AbstractInferencer)ctx.getAttribute(ProofContext.INFERENCER);
 			if (infer.getInferStatementsFlag() == false)
 				return StatementIterator.EMPTY;
 
 			// handle an explicit statement
-			AbstractRepositoryConnection conn = (AbstractRepositoryConnection)ctx.getAttribute(REPOSITORY_CONNECTION);
+			AbstractRepositoryConnection conn = (AbstractRepositoryConnection)ctx.getAttribute(ProofContext.REPOSITORY_CONNECTION);
 			boolean isExplicit = false;
 			boolean isDerivedFromSameAs = false;
 			{
@@ -356,7 +307,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			}
 		}
 		// the request context that stores the instance and the options for that iterator (current inferencer, repository connection etc)
-		ContextImpl ctx;
+		ProofContext ctx;
 		// the key assigned to that instance to it can be retrieved from the context
 		String key;
 		// this the the Value(Request scoped bnode) designating the currently running instance (used to fetch the task from the context if multiple instances are 
@@ -375,8 +326,8 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 		Solution current = null;
 		int currentNo = -1;
 		long[] values = null;
-		public ExplainIter(ContextImpl ctx2, long reificationId2, long subj, long pred, long obj, boolean isExplicit,
-				boolean isDerivedFromSameAs, long aContext) {
+		public ExplainIter(ProofContext ctx2, long reificationId2, long subj, long pred, long obj, boolean isExplicit,
+						   boolean isDerivedFromSameAs, long aContext) {
 			ctx = ctx2;
 			reificationId = reificationId2;
 			this.subj = subj;
