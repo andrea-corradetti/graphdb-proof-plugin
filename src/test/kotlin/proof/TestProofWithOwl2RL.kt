@@ -180,7 +180,7 @@ class TestProofWithOwl2RL {
             println("antecedents - $resultList")
             assertEquals("Result has 2 antecedents", 2, resultList.count())
 
-            val isAntecedentFromG1 = resultList.any {bindingSet ->
+            val isAntecedentFromG1 = resultList.any { bindingSet ->
                 bindingSet.getBinding("context").value.stringValue() == "http://www.example.com/G1"
             }
 
@@ -192,7 +192,7 @@ class TestProofWithOwl2RL {
             println("antecedents - $resultList")
             assertEquals("Result has 2 antecedents", 2, resultList.count())
 
-            val isAntecedentFromG1 = resultList.any {bindingSet ->
+            val isAntecedentFromG1 = resultList.any { bindingSet ->
                 bindingSet.getBinding("context").value.stringValue() == "http://www.example.com/G2"
             }
 

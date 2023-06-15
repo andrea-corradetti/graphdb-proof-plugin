@@ -1,18 +1,12 @@
 package proof;
 
 import com.ontotext.trree.*;
-import com.ontotext.trree.query.QueryResultIterator;
-import com.ontotext.trree.query.StatementSource;
 import com.ontotext.trree.sdk.Entities.Scope;
 import com.ontotext.trree.sdk.*;
-import com.ontotext.trree.sdk.SystemPluginOptions.Option;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Iterator;
 
 /**
  * This is a plugin that can return rules and particular premises that
@@ -202,10 +196,10 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
             PluginConnection pluginConnection, RequestContext requestContext) {
 		// make sure we have the proper request context set when preprocess() has been invoked
 		// if not return EMPTY
-		ProofContext ctx = (requestContext instanceof ProofContext)?(ProofContext)requestContext:null;
+		ProofContext proofContext = (requestContext instanceof ProofContext)?(ProofContext)requestContext:null;
 
 		// not our context
-		if (ctx == null)
+		if (proofContext == null)
 			return StatementIterator.EMPTY;
 		
 		if (predicate == explainId) {
@@ -215,22 +209,23 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			long subjToExplain = objects[0];
 			long objToExplain = objects[1];
 			long predToExplain = objects[2];
-			long ctxToExplain = (objects.length == 4 ) ? objects[3] : 0;
+			long ctxToExplain = (objects.length == 4 ) ? objects[3] : -9999; //FIXME placeholder context.
 			// empty if no binding, or some of the nodes is not a regular entity
 			if (subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0)
 				return StatementIterator.EMPTY;
 			// a context if an explicit exists
 			long aContext = 0;
-			AbstractInferencer infer = (AbstractInferencer)ctx.getAttribute(ProofContext.INFERENCER);
+			AbstractInferencer infer = (AbstractInferencer)proofContext.getAttribute(ProofContext.INFERENCER);
 			if (infer.getInferStatementsFlag() == false)
 				return StatementIterator.EMPTY;
 
 			// handle an explicit statement
-			AbstractRepositoryConnection conn = (AbstractRepositoryConnection)ctx.getAttribute(ProofContext.REPOSITORY_CONNECTION);
+			AbstractRepositoryConnection conn = (AbstractRepositoryConnection)proofContext.getAttribute(ProofContext.REPOSITORY_CONNECTION);
 			boolean isExplicit = false;
 			boolean isDerivedFromSameAs = false;
 			{
 				StatementIdIterator iter = conn.getStatements(subjToExplain, objToExplain, predToExplain, StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS);
+				logger.debug("iter getStatements context" + iter.context);
 				try {
 					isExplicit = iter.hasNext();
 					aContext = iter.context;
@@ -245,14 +240,14 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 			long reificationId = pluginConnection.getEntities().put(SimpleValueFactory.getInstance().createBNode(), Scope.REQUEST);
 			
 			// create a Task instance and pass the iterator of the statements from the target graph
-			ExplainIter ret = new ExplainIter(ctx, reificationId, subjToExplain, objToExplain, predToExplain,
-					isExplicit, isDerivedFromSameAs, aContext);
+			ExplainIter ret = new ExplainIter(this, proofContext, reificationId, subjToExplain, objToExplain, predToExplain, ctxToExplain,
+					isExplicit, isDerivedFromSameAs, aContext, logger);
 			// access the inferencers and the repository connection from systemoptions
 			ret.infer = infer;
 			ret.conn = conn;
 			ret.init();
 			// store the task into request context  
-			ctx.setAttribute(KEY_STORAGE+reificationId, ret);
+			proofContext.setAttribute(KEY_STORAGE+reificationId, ret);
 			
 			// return the newly created task instance (it is a valid StatementIterator that could be reevaluated until all solutions are 
 			// generated)
@@ -260,187 +255,5 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 		}
 		return null;
 	}
-	
-	class ExplainIter extends StatementIterator implements ReportSupportedSolution {
-		class Solution {
-			String rule;
-			ArrayList<long[]> premises;
-			Solution(String rule, ArrayList<long[]> premises) {
-				this.rule = rule;
-				this.premises = premises;
-			}
-			public String toString() {
-				StringBuilder builder = new StringBuilder();
-				builder.append("rule:").append(rule).append("\n");
-				for (long[] p : premises) {
-					builder.append(p[0]).append(",").append(p[1]).append(",");
-					builder.append(p[2]).append(",").append(p[3]).append("\n");
-				}
-				return builder.toString();
-			}
-			@Override
-			public boolean equals(Object oObj) {
-				if (!(oObj instanceof Solution))
-					return false;
-				Solution other = (Solution)oObj;
-				if (other == this)
-					return true;
-				if (!other.rule.equals(this.rule))
-					return false;
-				
-				if (other.premises.size() != this.premises.size())
-					return false;
 
-				//crosscheck
-				for (long[] p : this.premises) {
-					boolean exists = false;
-					for (long[] o : other.premises) {
-						if (o[0] == p[0] && o[1] == p[1] && o[2] == p[2] && o[3]== p[3] && o[4] == p[4]) {
-							exists = true;
-							break;
-						}
-					}
-					if (!exists)
-						return false;
-				}
-				return true;
-			}
-		}
-		// the request context that stores the instance and the options for that iterator (current inferencer, repository connection etc)
-		ProofContext ctx;
-		// the key assigned to that instance to it can be retrieved from the context
-		String key;
-		// this the the Value(Request scoped bnode) designating the currently running instance (used to fetch the task from the context if multiple instances are 
-		// evaluated within same query0
-		long reificationId;
-		// instance of the inference to work with
-		AbstractInferencer infer;
-		// connection to the raw data to get only the AXIOM statements
-		AbstractRepositoryConnection conn;
-		long subj, pred, obj;
-		boolean isExplicit = false;
-		boolean isDerivedFromSameAs = false;
-		long aContext = 0;
-		ArrayList<Solution> solutions = new ArrayList<Solution>();
-		Iterator<Solution> iter;
-		Solution current = null;
-		int currentNo = -1;
-		long[] values = null;
-		public ExplainIter(ProofContext ctx2, long reificationId2, long subj, long pred, long obj, boolean isExplicit,
-						   boolean isDerivedFromSameAs, long aContext) {
-			ctx = ctx2;
-			reificationId = reificationId2;
-			this.subj = subj;
-			this.pred = pred;
-			this.obj = obj;
-			this.isExplicit = isExplicit;
-			this.isDerivedFromSameAs = isDerivedFromSameAs;
-			this.aContext = aContext;
-			this.subject = reificationId;
-			this.predicate = explainId;
-		}
-		public void init() {
-			if (!isExplicit) {
-				infer.isSupported(subj, pred, obj, 0, 0, this);
-				iter = solutions.iterator();
-				if (iter.hasNext())
-					current = iter.next();
-				if (current != null) {
-					currentNo = 0;
-				}
-			} else {
-				ArrayList<long[]> arr = new ArrayList<long[]>();
-				arr.add(new long[] {subj, pred, obj, aContext});
-				current = new Solution("explicit", arr);
-				currentNo = 0;
-				iter = new Iterator<Solution>() {
-
-					@Override
-					public boolean hasNext() {
-						return false;
-					}
-
-					@Override
-					public Solution next() {
-						return null;
-					}
-					
-				};
-			}
-		}
-		@Override
-		public boolean report(String ruleName, QueryResultIterator q) {
-			logger.debug("report rule {} for {},{},{}", ruleName, this.subj, this.pred, this.obj);
-			while (q.hasNext()) {
-				if (q instanceof StatementSource) {
-					StatementSource source = (StatementSource)q;
-					Iterator<StatementIdIterator> sol = source.solution();
-					boolean isSame = false;
-					ArrayList<long[]> aSolution = new ArrayList<long[]>();
-					while (sol.hasNext()) {
-						StatementIdIterator iter = sol.next();
-						// try finding an existing explicit or in-context with same subj, pred and obj
-						try(StatementIdIterator ctxIter = conn.getStatements(iter.subj, iter.pred, iter.obj, true, 0, contextMask)) {
-							while (ctxIter.hasNext()) {
-								if (ctxIter.context != SystemGraphs.EXPLICIT_GRAPH.getId()) {
-									iter.context = ctxIter.context;
-									iter.status = ctxIter.status;
-									break;
-								}
-								ctxIter.next();
-							}
-							ctxIter.close();
-						}
-						if (iter.subj == this.subj && iter.pred == this.pred && iter.obj == this.obj)
-							isSame = true;
-						aSolution.add(new long[] {iter.subj, iter.pred, iter.obj, iter.context, iter.status});
-					}
-					Solution solution = new Solution(ruleName, aSolution);
-					logger.debug("isSelfReferentioal {} for solution {}", isSame, solution);
-					if (!isSame) {
-						if (!solutions.contains(solution)) {
-							logger.debug("added");
-							solutions.add(solution);
-						} else {
-							logger.debug("already added");
-						}
-					} else {
-						logger.debug("not added - self referential");
-					}
-				}
-				q.next();
-			}
-			return false;
-		}
-
-		@Override
-		public void close() {
-			current = null;
-			solutions = null;
-		}
-
-		@Override
-		public boolean next() {
-			while (current != null) {
-				if (currentNo < current.premises.size()) {
-					values = current.premises.get(currentNo);
-					currentNo ++;
-					return true;
-				} else {
-					values = null;
-					currentNo = 0;
-					if (iter.hasNext())
-						current = iter.next();
-					else
-						current = null;
-				}
-			}
-			return false;
-		}
-		@Override
-		public AbstractRepositoryConnection getConnection() {
-			return conn;
-		}
-		
-	}
 }
