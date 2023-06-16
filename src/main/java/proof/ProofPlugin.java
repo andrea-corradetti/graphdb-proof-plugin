@@ -215,12 +215,12 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 				return StatementIterator.EMPTY;
 			// a context if an explicit exists
 			long aContext = 0;
-			AbstractInferencer infer = (AbstractInferencer)proofContext.getAttribute(ProofContext.INFERENCER);
+			AbstractInferencer infer = proofContext.inferencer;
 			if (infer.getInferStatementsFlag() == false)
 				return StatementIterator.EMPTY;
 
 			// handle an explicit statement
-			AbstractRepositoryConnection conn = (AbstractRepositoryConnection)proofContext.getAttribute(ProofContext.REPOSITORY_CONNECTION);
+			AbstractRepositoryConnection conn = proofContext.repositoryConnection;
 			boolean isExplicit = false;
 			boolean isDerivedFromSameAs = false;
 			{

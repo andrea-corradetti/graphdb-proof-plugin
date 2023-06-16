@@ -9,32 +9,33 @@ import com.ontotext.trree.sdk.SystemPluginOptions;
 
 import java.util.HashMap;
 
+import static com.ontotext.trree.sdk.SystemPluginOptions.Option.ACCESS_INFERENCER;
+import static com.ontotext.trree.sdk.SystemPluginOptions.Option.ACCESS_REPOSITORY_CONNECTION;
+
 /**
  * this is the context implementation where the plugin stores currently running patterns
  * it just keeps some values using sting keys for further access
  */
 class ProofContext implements RequestContext {
 
-    static final String REPOSITORY_CONNECTION = "repconn";
-    // private key to store the inferencer in the request context
-    static final String INFERENCER = "infer";
+    AbstractInferencer inferencer;
+    AbstractRepositoryConnection repositoryConnection;
+
     HashMap<String, Object> map = new HashMap<String, Object>();
     Request request;
 
     public ProofContext(Request request) {
         this.request = request;
-        if (request != null ) {
+        if (request != null) {
             RequestOptions ops = request.getOptions();
-            if (ops != null && ops instanceof SystemPluginOptions) {
-                // retrieve the inferencer from the systemPluginOptions instance
-                Object obj = ((SystemPluginOptions)ops).getOption(SystemPluginOptions.Option.ACCESS_INFERENCER);
+            if (ops instanceof SystemPluginOptions) {
+                Object obj = ((SystemPluginOptions) ops).getOption(ACCESS_INFERENCER);
                 if (obj instanceof AbstractInferencer) {
-                    setAttribute(ProofContext.INFERENCER, obj);
+                    inferencer = (AbstractInferencer) obj;
                 }
-                // retrieve the repository connection from the systemPluginOptions instance
-                obj = ((SystemPluginOptions)ops).getOption(SystemPluginOptions.Option.ACCESS_REPOSITORY_CONNECTION);
+                obj = ((SystemPluginOptions) ops).getOption(ACCESS_REPOSITORY_CONNECTION);
                 if (obj instanceof AbstractRepositoryConnection) {
-                    setAttribute(ProofContext.REPOSITORY_CONNECTION, obj);
+                    repositoryConnection = (AbstractRepositoryConnection) obj;
                 }
             }
         }
