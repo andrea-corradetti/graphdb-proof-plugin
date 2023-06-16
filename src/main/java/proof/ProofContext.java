@@ -6,6 +6,8 @@ import com.ontotext.trree.sdk.Request;
 import com.ontotext.trree.sdk.RequestContext;
 import com.ontotext.trree.sdk.RequestOptions;
 import com.ontotext.trree.sdk.SystemPluginOptions;
+import org.slf4j.Logger;
+
 
 import java.util.HashMap;
 
@@ -20,11 +22,13 @@ class ProofContext implements RequestContext {
 
     AbstractInferencer inferencer;
     AbstractRepositoryConnection repositoryConnection;
-
-    HashMap<String, Object> map = new HashMap<>();
     Request request;
+    HashMap<String, Object> map = new HashMap<>();
 
-    public ProofContext(Request request) {
+    Logger logger;
+
+    public ProofContext(Request request, Logger logger) {
+        this.logger = logger;
         this.request = request;
         if (request != null) {
             RequestOptions ops = request.getOptions();

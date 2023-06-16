@@ -11,8 +11,9 @@ import java.util.Iterator;
 
 class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
-    private final Logger logger;
     private final Quad statementToExplain;
+
+    private final Logger logger;
 
     // the key assigned to that instance to it can be retrieved from the context
     String key;
@@ -36,12 +37,11 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     long[] values = null;
 
     public ExplainIter(ProofContext proofContext, long reificationId, long explainId, Quad statementToExplain, boolean isExplicit,
-                       boolean isDerivedFromSameAs, long aContext, Logger logger) {
+                       boolean isDerivedFromSameAs, long aContext) {
         this.reificationId = reificationId;
         this.subject = this.reificationId;
         this.predicate = explainId;
 
-        this.logger = logger;
 
         this.statementToExplain = statementToExplain;
 
@@ -50,6 +50,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
         this.aContext = aContext;
         this.inferencer = proofContext.inferencer;
         this.repositoryConnection = proofContext.repositoryConnection;
+        this.logger = proofContext.logger;
         this.init();
     }
 

@@ -128,7 +128,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
      */
     @Override
     public RequestContext preprocess(Request request) {
-        return new ProofContext(request);
+        return new ProofContext(request, logger);
     }
 
     /**
@@ -206,7 +206,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long reificationId = pluginConnection.getEntities().put(bnode(), Scope.REQUEST);
 
         // create a Task instance and pass the iterator of the statements from the target graph
-        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, isExplicit, isDerivedFromSameAs, explicitContext, logger);
+        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, isExplicit, isDerivedFromSameAs, explicitContext);
 
         // store the task into request context
         proofContext.setAttribute(KEY_STORAGE + reificationId, ret);
@@ -215,5 +215,4 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         // generated)
         return ret;
     }
-
 }
