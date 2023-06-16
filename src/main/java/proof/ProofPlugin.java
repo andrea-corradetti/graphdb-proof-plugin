@@ -5,12 +5,11 @@ import com.ontotext.trree.StatementIdIterator;
 import com.ontotext.trree.sdk.Entities.Scope;
 import com.ontotext.trree.sdk.*;
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.eclipse.rdf4j.model.util.Values.bnode;
-import static org.eclipse.rdf4j.model.util.Values.iri;
+import static org.eclipse.rdf4j.model.util.Values.*;
+
 
 /**
  * This is a plugin that can return rules and particular premises that
@@ -36,6 +35,7 @@ import static org.eclipse.rdf4j.model.util.Values.iri;
  * @author damyan.ognyanov
  */
 public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPlugin, Preprocessor, PatternInterpreter, ListPatternInterpreter {
+    public static final int UNBOUND = 0;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     public static final String NAMESPACE = "http://www.ontotext.com/proof/";
@@ -65,50 +65,38 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
      */
     @Override
     public StatementIterator interpret(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
-        if (predicate != explainId && predicate != ruleId && predicate != contextId && predicate != subjId && predicate != predId && predicate != objId)
+        boolean shouldNotHandlePredicate = predicate != explainId && predicate != ruleId && predicate != contextId && predicate != subjId && predicate != predId && predicate != objId;
+        if (shouldNotHandlePredicate)
             return null;
 
-        // make sure we have the proper request context set when preprocess() has been invoked
-        // if not return EMPTY
         ProofContext ctx = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
-
-        // not our context
         if (ctx == null) return StatementIterator.EMPTY;
 
+
+        ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
+        if (task == null || (task.current == null)) return StatementIterator.EMPTY;
+
+
         if (predicate == ruleId) {
-            // same for the object
-            ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-            if (task == null || (task.current == null)) return StatementIterator.EMPTY;
             // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predicate, pluginConnection.getEntities().put(SimpleValueFactory.getInstance().createLiteral(task.current.rule), Scope.REQUEST), 0);
+            long rule = pluginConnection.getEntities().put(literal(task.current.rule), Scope.REQUEST);
+            return StatementIterator.create(task.reificationId, ruleId, rule, 0);
         } else if (predicate == subjId) {
-            // same for the object
-            ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-            if (task == null || (task.current == null)) return StatementIterator.EMPTY;
-            if (object != 0 && task.values[0] != object) return StatementIterator.EMPTY;
+            if (object != UNBOUND && object != task.values[0]) return StatementIterator.EMPTY;
             // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predicate, task.values[0], 0);
+            return StatementIterator.create(task.reificationId, subjId, task.values[0], 0);
         } else if (predicate == predId) {
-            // same for the object
-            ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-            if (task == null || (task.current == null)) return StatementIterator.EMPTY;
-            if (object != 0 && task.values[1] != object) return StatementIterator.EMPTY;
+            if (object != UNBOUND && object != task.values[1]) return StatementIterator.EMPTY;
             // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predicate, task.values[1], 0);
+            return StatementIterator.create(task.reificationId, predId, task.values[1], 0);
         } else if (predicate == objId) {
-            // same for the object
-            ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-            if (task == null || (task.current == null)) return StatementIterator.EMPTY;
-            if (object != 0 && task.values[2] != object) return StatementIterator.EMPTY;
+            if (object != UNBOUND && object != task.values[2]) return StatementIterator.EMPTY;
             // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predicate, task.values[2], 0);
+            return StatementIterator.create(task.reificationId, objId, task.values[2], 0);
         } else if (predicate == contextId) {
-            // same for the object
-            ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-            if (task == null || (task.current == null)) return StatementIterator.EMPTY;
-            if (object != 0 && task.values[3] != object) return StatementIterator.EMPTY;
+            if (object != UNBOUND && object != task.values[3]) return StatementIterator.EMPTY;
             // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predicate, task.values[3], 0);
+            return StatementIterator.create(task.reificationId, contextId, task.values[3], 0);
         }
 
         // if the predicate is not one of the registered in the ProvenancePlugin return null
