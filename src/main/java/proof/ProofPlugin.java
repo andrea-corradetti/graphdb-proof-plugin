@@ -39,7 +39,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     public static final String NAMESPACE = "http://www.ontotext.com/proof/";
-
     public static final IRI EXPLAIN_URI = iri(NAMESPACE + "explain");
     public static final IRI RULE_URI = iri(NAMESPACE + "rule");
     public static final IRI SUBJ_URI = iri(NAMESPACE + "subject");
@@ -48,14 +47,14 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     public static final IRI CONTEXT_URI = iri(NAMESPACE + "context");
     private final static String KEY_STORAGE = "storage";
 
-    int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
+    final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
 
-    long explainId = 0;
-    long ruleId = 0;
-    long subjId = 0;
-    long predId = 0;
-    long objId = 0;
-    long contextId = 0;
+    long explainId;
+    long ruleId;
+    long subjId;
+    long predId;
+    long objId;
+    long contextId;
 
     /*
      * main entry for predicate resolution of the ProvenancePlugin
@@ -66,41 +65,33 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     @Override
     public StatementIterator interpret(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
         boolean shouldNotHandlePredicate = predicate != explainId && predicate != ruleId && predicate != contextId && predicate != subjId && predicate != predId && predicate != objId;
-        if (shouldNotHandlePredicate)
-            return null;
+        if (shouldNotHandlePredicate) return null;
 
-        ProofContext ctx = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
-        if (ctx == null) return StatementIterator.EMPTY;
+        ProofContext proofContext = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
+        if (proofContext == null) return StatementIterator.EMPTY;
 
+        ExplainIter explainIter = (ExplainIter) proofContext.getAttribute(KEY_STORAGE + subject);
+        if (explainIter == null || (explainIter.current == null)) return StatementIterator.EMPTY;
 
-        ExplainIter task = (ExplainIter) ctx.getAttribute(KEY_STORAGE + subject);
-        if (task == null || (task.current == null)) return StatementIterator.EMPTY;
-
-
+        // bind the value of the predicate from the current solution as object of the triple pattern
         if (predicate == ruleId) {
-            // bind the value of the predicate from the current solution as object of the triple pattern
-            long rule = pluginConnection.getEntities().put(literal(task.current.rule), Scope.REQUEST);
-            return StatementIterator.create(task.reificationId, ruleId, rule, 0);
+            long rule = pluginConnection.getEntities().put(literal(explainIter.current.rule), Scope.REQUEST);
+            return StatementIterator.create(explainIter.reificationId, ruleId, rule, 0);
         } else if (predicate == subjId) {
-            if (object != UNBOUND && object != task.values[0]) return StatementIterator.EMPTY;
-            // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, subjId, task.values[0], 0);
+            if (object != UNBOUND && object != explainIter.values[0]) return StatementIterator.EMPTY;
+            return StatementIterator.create(explainIter.reificationId, subjId, explainIter.values[0], 0);
         } else if (predicate == predId) {
-            if (object != UNBOUND && object != task.values[1]) return StatementIterator.EMPTY;
-            // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, predId, task.values[1], 0);
+            if (object != UNBOUND && object != explainIter.values[1]) return StatementIterator.EMPTY;
+            return StatementIterator.create(explainIter.reificationId, predId, explainIter.values[1], 0);
         } else if (predicate == objId) {
-            if (object != UNBOUND && object != task.values[2]) return StatementIterator.EMPTY;
-            // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, objId, task.values[2], 0);
+            if (object != UNBOUND && object != explainIter.values[2]) return StatementIterator.EMPTY;
+            return StatementIterator.create(explainIter.reificationId, objId, explainIter.values[2], 0);
         } else if (predicate == contextId) {
-            if (object != UNBOUND && object != task.values[3]) return StatementIterator.EMPTY;
-            // bind the value of the predicate from the current solution as object of the triple pattern
-            return StatementIterator.create(task.reificationId, contextId, task.values[3], 0);
+            if (object != UNBOUND && object != explainIter.values[3]) return StatementIterator.EMPTY;
+            return StatementIterator.create(explainIter.reificationId, contextId, explainIter.values[3], 0);
+        } else {
+            return null;
         }
-
-        // if the predicate is not one of the registered in the ProvenancePlugin return null
-        return null;
     }
 
     /**
@@ -110,7 +101,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
      */
     @Override
     public double estimate(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
-        // if subject is not bound, any patttern return max value until there is some binding ad subject place
+        // if subject is not bound, any pattern return max value until there is some binding ad subject place
         if (subject == 0) return Double.MAX_VALUE;
         // explain fetching predicates
         if (predicate == ruleId || predicate == subjId || predicate == predId || predicate == objId || predicate == contextId) {
@@ -132,7 +123,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     @Override
     public RequestContext preprocess(Request request) {
         return new ProofContext(request);
-
     }
 
     /**
@@ -140,8 +130,6 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
      */
     @Override
     public void initialize(InitReason initReason, PluginConnection pluginConnection) {
-        // register the predicates
-
         explainId = pluginConnection.getEntities().put(EXPLAIN_URI, Scope.SYSTEM);
         ruleId = pluginConnection.getEntities().put(RULE_URI, Scope.SYSTEM);
         subjId = pluginConnection.getEntities().put(SUBJ_URI, Scope.SYSTEM);
@@ -165,9 +153,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         ProofContext proofContext = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
         if (proofContext == null) return StatementIterator.EMPTY;
 
-        if (predicate != explainId) {
-            return null;
-        }
+        if (predicate != explainId) return null;
 
         if (objects == null || objects.length < 3 || objects.length > 4) return StatementIterator.EMPTY;
 
@@ -176,21 +162,17 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long predToExplain = objects[2];
         long ctxToExplain = (objects.length == 4) ? objects[3] : -9999; //FIXME placeholder context.
 
-        // empty if no binding, or some of the nodes is not a regular entity
-        boolean areObjectBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
-        if (areObjectBoundIncorrectly) return StatementIterator.EMPTY;
+        boolean areObjectsBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
+        if (areObjectsBoundIncorrectly) return StatementIterator.EMPTY;
 
         if (!proofContext.inferencer.getInferStatementsFlag()) return StatementIterator.EMPTY;
-
-        AbstractRepositoryConnection conn = proofContext.repositoryConnection;
-
 
         // handle an explicit statement
         long aContext = 0; // a context if an explicit exists
         boolean isExplicit = false;
         boolean isDerivedFromSameAs = false;
 
-        StatementIdIterator iter = conn.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
+        StatementIdIterator iter = proofContext.repositoryConnection.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
         try (iter) {
             logger.debug("iter getStatements context" + iter.context);
             isExplicit = iter.hasNext();
@@ -205,9 +187,9 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
         // create a Task instance and pass the iterator of the statements from the target graph
         ExplainIter ret = new ExplainIter(this, proofContext, reificationId, subjToExplain, objToExplain, predToExplain, ctxToExplain, isExplicit, isDerivedFromSameAs, aContext, logger);
-        // access the inferencers and the repository connection from systemoptions
+        // access the inferencer and the repository connection from systemOptions
         ret.infer = proofContext.inferencer;
-        ret.conn = conn;
+        ret.conn = proofContext.repositoryConnection;
         ret.init();
         // store the task into request context
         proofContext.setAttribute(KEY_STORAGE + reificationId, ret);

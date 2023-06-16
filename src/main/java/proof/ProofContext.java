@@ -21,7 +21,7 @@ class ProofContext implements RequestContext {
     AbstractInferencer inferencer;
     AbstractRepositoryConnection repositoryConnection;
 
-    HashMap<String, Object> map = new HashMap<String, Object>();
+    HashMap<String, Object> map = new HashMap<>();
     Request request;
 
     public ProofContext(Request request) {
