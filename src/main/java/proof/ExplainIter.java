@@ -96,7 +96,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                 while (sol.hasNext()) {
                     StatementIdIterator iter = sol.next();
                     // try finding an existing explicit or in-context with same subj, pred and obj
-                    try (StatementIdIterator ctxIter = conn.getStatements(iter.subj, iter.pred, iter.obj, true, 0, proofPlugin.contextMask)) {
+                    try (StatementIdIterator ctxIter = conn.getStatements(iter.subj, iter.pred, iter.obj, true, 0, proofPlugin.excludeDeletedHiddenInferred)) {
                         logger.debug(String.format("Contesti di %d %d %d", iter.subj, iter.pred, iter.obj));
                         if (ctxToExplain == -9999) { //normal proof behaviour
                             while (ctxIter.hasNext()) {
