@@ -29,25 +29,24 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     boolean isExplicit;
     boolean isDerivedFromSameAs;
-    long aContext;
+    long explicitContext; //FIXME possibly misguiding name
+
     ArrayList<Solution> solutions = new ArrayList<>();
     Iterator<Solution> iter;
     Solution current = null;
     int currentNo = -1;
     long[] values = null;
 
-    public ExplainIter(ProofContext proofContext, long reificationId, long explainId, Quad statementToExplain, boolean isExplicit,
-                       boolean isDerivedFromSameAs, long aContext) {
+    public ExplainIter(ProofContext proofContext, long reificationId, long explainId, Quad statementToExplain, ExplicitStatementProps explicitStatementProps) {
         this.reificationId = reificationId;
         this.subject = this.reificationId;
         this.predicate = explainId;
 
-
         this.statementToExplain = statementToExplain;
 
-        this.isExplicit = isExplicit;
-        this.isDerivedFromSameAs = isDerivedFromSameAs;
-        this.aContext = aContext;
+        this.isExplicit = explicitStatementProps.isExplicit;
+        this.isDerivedFromSameAs = explicitStatementProps.isDerivedFromSameAs;
+        this.explicitContext = explicitStatementProps.explicitContext;
         this.inferencer = proofContext.inferencer;
         this.repositoryConnection = proofContext.repositoryConnection;
         this.logger = proofContext.logger;
@@ -57,7 +56,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     public void init() {
         if (isExplicit) {
             ArrayList<long[]> arr = new ArrayList<>();
-            arr.add(new long[]{statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, aContext});
+            arr.add(new long[]{statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, explicitContext});
             current = new Solution("explicit", arr);
             currentNo = 0;
             iter = getEmptySolutionIterator();
@@ -93,6 +92,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             if (q instanceof StatementSource) {
                 StatementSource source = (StatementSource) q;
                 Iterator<StatementIdIterator> sol = source.solution();
+
                 boolean isSame = false;
                 ArrayList<long[]> aSolution = new ArrayList<long[]>();
                 while (sol.hasNext()) {

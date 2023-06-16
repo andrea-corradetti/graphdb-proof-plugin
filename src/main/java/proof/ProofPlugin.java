@@ -50,12 +50,12 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
     public static final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
 
-    long explainId;
-    long ruleId;
-    long subjId;
-    long predId;
-    long objId;
-    long contextId;
+    private long explainId;
+    private long ruleId;
+    private long subjId;
+    private long predId;
+    private long objId;
+    private long contextId;
 
     /*
      * main entry for predicate resolution of the ProvenancePlugin
@@ -66,13 +66,19 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     @Override
     public StatementIterator interpret(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
         boolean shouldNotHandlePredicate = predicate != explainId && predicate != ruleId && predicate != contextId && predicate != subjId && predicate != predId && predicate != objId;
-        if (shouldNotHandlePredicate) return null;
+        if (shouldNotHandlePredicate) {
+            return null;
+        }
 
         ProofContext proofContext = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
-        if (proofContext == null) return StatementIterator.EMPTY;
+        if (proofContext == null) {
+            return StatementIterator.EMPTY;
+        }
 
         ExplainIter explainIter = (ExplainIter) proofContext.getAttribute(KEY_STORAGE + subject);
-        if (explainIter == null || (explainIter.current == null)) return StatementIterator.EMPTY;
+        if (explainIter == null || (explainIter.current == null)) {
+            return StatementIterator.EMPTY;
+        }
 
         return getStatementIterator(predicate, object, pluginConnection, explainIter);
     }
@@ -108,12 +114,14 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     @Override
     public double estimate(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
         // if subject is not bound, any pattern return max value until there is some binding ad subject place
-        if (subject == UNBOUND) return Double.MAX_VALUE;
+        if (subject == UNBOUND) {
+            return Double.MAX_VALUE;
+        }
         // explain fetching predicates
         if (predicate == ruleId || predicate == subjId || predicate == predId || predicate == objId || predicate == contextId) {
             return 1.0;
         }
-        // unknown predicate??? maybe it is good to throw an exception
+        // unknown predicate??? maybe it is good to throw an exception //no idea what to do about this old comment
         return Double.MAX_VALUE;
     }
 
@@ -189,24 +197,13 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
             return StatementIterator.EMPTY;
         }
 
-        // handle an explicit statement
-        long explicitContext = 0; // a context if an explicit exists
-        boolean isExplicit = false;
-        boolean isDerivedFromSameAs = false;
-
-        StatementIdIterator iterForExplicit = proofContext.repositoryConnection.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
-        try (iterForExplicit) {
-            logger.debug("iter getStatements context" + iterForExplicit.context);
-            isExplicit = iterForExplicit.hasNext();
-            explicitContext = iterForExplicit.context;
-            isDerivedFromSameAs = 0 != (iterForExplicit.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS); // handle if explicit comes from sameAs
-        }
+        ExplicitStatementProps explicitStatementProps = getExplicitStatementProps(subjToExplain, objToExplain, predToExplain, proofContext);
 
         // allocate a request scope id
         long reificationId = pluginConnection.getEntities().put(bnode(), Scope.REQUEST);
 
         // create a Task instance and pass the iterator of the statements from the target graph
-        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, isExplicit, isDerivedFromSameAs, explicitContext);
+        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, explicitStatementProps);
 
         // store the task into request context
         proofContext.setAttribute(KEY_STORAGE + reificationId, ret);
@@ -215,4 +212,23 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         // generated)
         return ret;
     }
+
+    @NotNull
+    private ExplicitStatementProps getExplicitStatementProps(long subjToExplain, long objToExplain, long predToExplain, ProofContext proofContext) {
+        boolean isExplicit;
+        long explicitContext;
+        boolean isDerivedFromSameAs;
+        StatementIdIterator iterForExplicit = proofContext.repositoryConnection.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
+        try (iterForExplicit) {
+            logger.debug("iter getStatements context" + iterForExplicit.context);
+            isExplicit = iterForExplicit.hasNext();
+            explicitContext = iterForExplicit.context;
+            isDerivedFromSameAs = 0 != (iterForExplicit.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS); // handle if explicit comes from sameAs
+        }
+        return new ExplicitStatementProps(isExplicit, explicitContext, isDerivedFromSameAs);
+    }
+
+
 }
+
+
