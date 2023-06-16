@@ -35,19 +35,20 @@ import static org.eclipse.rdf4j.model.util.Values.*;
  * @author damyan.ognyanov
  */
 public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPlugin, Preprocessor, PatternInterpreter, ListPatternInterpreter {
-    public static final int UNBOUND = 0;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    public static final String NAMESPACE = "http://www.ontotext.com/proof/";
-    public static final IRI EXPLAIN_URI = iri(NAMESPACE + "explain");
-    public static final IRI RULE_URI = iri(NAMESPACE + "rule");
-    public static final IRI SUBJ_URI = iri(NAMESPACE + "subject");
-    public static final IRI PRED_URI = iri(NAMESPACE + "predicate");
-    public static final IRI OBJ_URI = iri(NAMESPACE + "object");
-    public static final IRI CONTEXT_URI = iri(NAMESPACE + "context");
-    private final static String KEY_STORAGE = "storage";
+    private static final String NAMESPACE = "http://www.ontotext.com/proof/";
+    private static final IRI EXPLAIN_URI = iri(NAMESPACE + "explain");
+    private static final IRI RULE_URI = iri(NAMESPACE + "rule");
+    private static final IRI SUBJ_URI = iri(NAMESPACE + "subject");
+    private static final IRI PRED_URI = iri(NAMESPACE + "predicate");
+    private static final IRI OBJ_URI = iri(NAMESPACE + "object");
+    private static final IRI CONTEXT_URI = iri(NAMESPACE + "context");
 
-    final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
+    private static final String KEY_STORAGE = "storage";
+    private static final int UNBOUND = 0;
+
+    public static final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
 
     long explainId;
     long ruleId;
@@ -177,6 +178,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long objToExplain = objects[1];
         long predToExplain = objects[2];
         long ctxToExplain = (objects.length == 4) ? objects[3] : -9999; //FIXME placeholder context.
+        Quad statementToExplain = new Quad(subjToExplain, objToExplain, predToExplain, ctxToExplain);
 
         boolean areObjectsBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
         if (areObjectsBoundIncorrectly) {
@@ -204,7 +206,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long reificationId = pluginConnection.getEntities().put(bnode(), Scope.REQUEST);
 
         // create a Task instance and pass the iterator of the statements from the target graph
-        ExplainIter ret = new ExplainIter(this, proofContext, reificationId, subjToExplain, objToExplain, predToExplain, ctxToExplain, isExplicit, isDerivedFromSameAs, explicitContext, logger);
+        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, isExplicit, isDerivedFromSameAs, explicitContext, logger);
 
         // store the task into request context
         proofContext.setAttribute(KEY_STORAGE + reificationId, ret);

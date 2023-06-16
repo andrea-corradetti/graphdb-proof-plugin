@@ -10,48 +10,44 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 class ExplainIter extends StatementIterator implements ReportSupportedSolution {
-    private final ProofPlugin proofPlugin;
 
     private final Logger logger;
+    private final Quad statementToExplain;
 
-    public long ctxToExplain;
-
-    // the request context that stores the instance and the options for that iterator (current inferencer, repository connection etc)
-    ProofContext proofContext;
     // the key assigned to that instance to it can be retrieved from the context
     String key;
     // this the the Value(Request scoped bnode) designating the currently running instance (used to fetch the task from the context if multiple instances are
     // evaluated within same query0
     long reificationId;
+
     // instance of the inference to work with
     AbstractInferencer inferencer;
     // connection to the raw data to get only the AXIOM statements
     AbstractRepositoryConnection repositoryConnection;
-    long subjToExplain, predToExplain, objToExplain;
-    boolean isExplicit = false;
-    boolean isDerivedFromSameAs = false;
-    long aContext = 0;
-    ArrayList<Solution> solutions = new ArrayList<Solution>();
+
+
+    boolean isExplicit;
+    boolean isDerivedFromSameAs;
+    long aContext;
+    ArrayList<Solution> solutions = new ArrayList<>();
     Iterator<Solution> iter;
     Solution current = null;
     int currentNo = -1;
     long[] values = null;
 
-    public ExplainIter(ProofPlugin proofPlugin, ProofContext proofContext, long reificationId2, long subjToExplain, long predToExplain, long objToExplain, long ctxToExplain, boolean isExplicit,
+    public ExplainIter(ProofContext proofContext, long reificationId, long explainId, Quad statementToExplain, boolean isExplicit,
                        boolean isDerivedFromSameAs, long aContext, Logger logger) {
-        this.proofPlugin = proofPlugin;
-        this.proofContext = proofContext;
-        reificationId = reificationId2;
-        this.subjToExplain = subjToExplain;
-        this.predToExplain = predToExplain;
-        this.objToExplain = objToExplain;
+        this.reificationId = reificationId;
+        this.subject = this.reificationId;
+        this.predicate = explainId;
+
+        this.logger = logger;
+
+        this.statementToExplain = statementToExplain;
+
         this.isExplicit = isExplicit;
         this.isDerivedFromSameAs = isDerivedFromSameAs;
         this.aContext = aContext;
-        this.subject = reificationId;
-        this.predicate = proofPlugin.explainId;
-        this.logger = logger;
-        this.ctxToExplain = ctxToExplain;
         this.inferencer = proofContext.inferencer;
         this.repositoryConnection = proofContext.repositoryConnection;
         this.init();
@@ -60,12 +56,12 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     public void init() {
         if (isExplicit) {
             ArrayList<long[]> arr = new ArrayList<>();
-            arr.add(new long[]{subjToExplain, predToExplain, objToExplain, aContext});
+            arr.add(new long[]{statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, aContext});
             current = new Solution("explicit", arr);
             currentNo = 0;
             iter = getEmptySolutionIterator();
         } else {
-            inferencer.isSupported(subjToExplain, predToExplain, objToExplain, 0, 0, this);
+            inferencer.isSupported(statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, 0, 0, this);
             iter = solutions.iterator();
             if (iter.hasNext())
                 current = iter.next();
@@ -91,7 +87,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     @Override
     public boolean report(String ruleName, QueryResultIterator q) {
-        logger.debug("report rule {} for {},{},{}", ruleName, this.subjToExplain, this.predToExplain, this.objToExplain);
+        logger.debug("report rule {} for {},{},{}", ruleName, statementToExplain.subject, statementToExplain.predicate, statementToExplain.object);
         while (q.hasNext()) {
             if (q instanceof StatementSource) {
                 StatementSource source = (StatementSource) q;
@@ -101,9 +97,9 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                 while (sol.hasNext()) {
                     StatementIdIterator iter = sol.next();
                     // try finding an existing explicit or in-context with same subj, pred and obj
-                    try (StatementIdIterator ctxIter = repositoryConnection.getStatements(iter.subj, iter.pred, iter.obj, true, 0, proofPlugin.excludeDeletedHiddenInferred)) {
+                    try (StatementIdIterator ctxIter = repositoryConnection.getStatements(iter.subj, iter.pred, iter.obj, true, 0, ProofPlugin.excludeDeletedHiddenInferred)) {
                         logger.debug(String.format("Contesti di %d %d %d", iter.subj, iter.pred, iter.obj));
-                        if (ctxToExplain == -9999) { //normal proof behaviour
+                        if (statementToExplain.context == -9999) { //normal proof behaviour
                             while (ctxIter.hasNext()) {
                                 logger.debug(String.valueOf(ctxIter.context));
                                 if (ctxIter.context != SystemGraphs.EXPLICIT_GRAPH.getId()) {
@@ -116,7 +112,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                         } else {
                             while (ctxIter.hasNext()) {
                                 logger.debug(String.valueOf(ctxIter.context));
-                                if (ctxIter.context == ctxToExplain) {
+                                if (ctxIter.context == statementToExplain.context) {
                                     iter.context = ctxIter.context;
                                     iter.status = ctxIter.status;
                                     break;
@@ -126,7 +122,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                         }
 
                     }
-                    if (iter.subj == this.subjToExplain && iter.pred == this.predToExplain && iter.obj == this.objToExplain) {
+                    if (iter.subj == statementToExplain.subject && iter.pred == statementToExplain.predicate && iter.obj == statementToExplain.object) {
                         isSame = true;
                     }
                     aSolution.add(new long[]{iter.subj, iter.pred, iter.obj, iter.context, iter.status});
