@@ -1,10 +1,10 @@
 package proof;
 
-import com.ontotext.trree.AbstractRepositoryConnection;
 import com.ontotext.trree.StatementIdIterator;
-import com.ontotext.trree.sdk.Entities.Scope;
 import com.ontotext.trree.sdk.*;
+import com.ontotext.trree.sdk.Entities.Scope;
 import org.eclipse.rdf4j.model.IRI;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +73,11 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         ExplainIter explainIter = (ExplainIter) proofContext.getAttribute(KEY_STORAGE + subject);
         if (explainIter == null || (explainIter.current == null)) return StatementIterator.EMPTY;
 
+        return getStatementIterator(predicate, object, pluginConnection, explainIter);
+    }
+
+    @NotNull
+    private StatementIterator getStatementIterator(long predicate, long object, PluginConnection pluginConnection, ExplainIter explainIter) {
         // bind the value of the predicate from the current solution as object of the triple pattern
         if (predicate == ruleId) {
             long rule = pluginConnection.getEntities().put(literal(explainIter.current.rule), Scope.REQUEST);
@@ -89,9 +94,9 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         } else if (predicate == contextId) {
             if (object != UNBOUND && object != explainIter.values[3]) return StatementIterator.EMPTY;
             return StatementIterator.create(explainIter.reificationId, contextId, explainIter.values[3], 0);
-        } else {
-            return null;
         }
+
+        throw new PluginException("Interpret is handling the wrong predicate");
     }
 
     /**
@@ -102,7 +107,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     @Override
     public double estimate(long subject, long predicate, long object, long context, PluginConnection pluginConnection, RequestContext requestContext) {
         // if subject is not bound, any pattern return max value until there is some binding ad subject place
-        if (subject == 0) return Double.MAX_VALUE;
+        if (subject == UNBOUND) return Double.MAX_VALUE;
         // explain fetching predicates
         if (predicate == ruleId || predicate == subjId || predicate == predId || predicate == objId || predicate == contextId) {
             return 1.0;
@@ -130,32 +135,43 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
      */
     @Override
     public void initialize(InitReason initReason, PluginConnection pluginConnection) {
-        explainId = pluginConnection.getEntities().put(EXPLAIN_URI, Scope.SYSTEM);
-        ruleId = pluginConnection.getEntities().put(RULE_URI, Scope.SYSTEM);
-        subjId = pluginConnection.getEntities().put(SUBJ_URI, Scope.SYSTEM);
-        predId = pluginConnection.getEntities().put(PRED_URI, Scope.SYSTEM);
-        objId = pluginConnection.getEntities().put(OBJ_URI, Scope.SYSTEM);
-        contextId = pluginConnection.getEntities().put(CONTEXT_URI, Scope.SYSTEM);
+        Entities entities = pluginConnection.getEntities();
+        explainId = entities.put(EXPLAIN_URI, Scope.SYSTEM);
+        ruleId = entities.put(RULE_URI, Scope.SYSTEM);
+        subjId = entities.put(SUBJ_URI, Scope.SYSTEM);
+        predId = entities.put(PRED_URI, Scope.SYSTEM);
+        objId = entities.put(OBJ_URI, Scope.SYSTEM);
+        contextId = entities.put(CONTEXT_URI, Scope.SYSTEM);
     }
 
     @Override
     public double estimate(long subject, long predicate, long[] objects, long context, PluginConnection pluginConnection, RequestContext requestContext) {
-        if (predicate == explainId) {
-            if (objects.length != 3) return Double.MAX_VALUE;
-            if (objects[0] == 0 || objects[1] == 0 || objects[2] == 0) return Double.MAX_VALUE;
-            return 10L;
+        if (predicate != explainId) {
+            return Double.MAX_VALUE;
         }
-        return Double.MAX_VALUE;
+        if (objects.length != 3) {
+            return Double.MAX_VALUE;
+        }
+        if (objects[0] == UNBOUND || objects[1] == UNBOUND || objects[2] == UNBOUND) {
+            return Double.MAX_VALUE;
+        }
+        return 10L;
     }
 
     @Override
     public StatementIterator interpret(long subject, long predicate, long[] objects, long context, PluginConnection pluginConnection, RequestContext requestContext) {
         ProofContext proofContext = (requestContext instanceof ProofContext) ? (ProofContext) requestContext : null;
-        if (proofContext == null) return StatementIterator.EMPTY;
+        if (proofContext == null) {
+            return StatementIterator.EMPTY;
+        }
 
-        if (predicate != explainId) return null;
+        if (predicate != explainId) {
+            return null;
+        }
 
-        if (objects == null || objects.length < 3 || objects.length > 4) return StatementIterator.EMPTY;
+        if (objects == null || objects.length < 3 || objects.length > 4) {
+            return StatementIterator.EMPTY;
+        }
 
         long subjToExplain = objects[0];
         long objToExplain = objects[1];
@@ -163,34 +179,33 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long ctxToExplain = (objects.length == 4) ? objects[3] : -9999; //FIXME placeholder context.
 
         boolean areObjectsBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
-        if (areObjectsBoundIncorrectly) return StatementIterator.EMPTY;
+        if (areObjectsBoundIncorrectly) {
+            return StatementIterator.EMPTY;
+        }
 
-        if (!proofContext.inferencer.getInferStatementsFlag()) return StatementIterator.EMPTY;
+        if (!proofContext.inferencer.getInferStatementsFlag()) {
+            return StatementIterator.EMPTY;
+        }
 
         // handle an explicit statement
-        long aContext = 0; // a context if an explicit exists
+        long explicitContext = 0; // a context if an explicit exists
         boolean isExplicit = false;
         boolean isDerivedFromSameAs = false;
 
-        StatementIdIterator iter = proofContext.repositoryConnection.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
-        try (iter) {
-            logger.debug("iter getStatements context" + iter.context);
-            isExplicit = iter.hasNext();
-            aContext = iter.context;
-            // handle if explicit comes from sameAs
-            isDerivedFromSameAs = 0 != (iter.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS);
+        StatementIdIterator iterForExplicit = proofContext.repositoryConnection.getStatements(subjToExplain, objToExplain, predToExplain, excludeDeletedHiddenInferred);
+        try (iterForExplicit) {
+            logger.debug("iter getStatements context" + iterForExplicit.context);
+            isExplicit = iterForExplicit.hasNext();
+            explicitContext = iterForExplicit.context;
+            isDerivedFromSameAs = 0 != (iterForExplicit.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS); // handle if explicit comes from sameAs
         }
 
-        // create task associated with the predicate
         // allocate a request scope id
         long reificationId = pluginConnection.getEntities().put(bnode(), Scope.REQUEST);
 
         // create a Task instance and pass the iterator of the statements from the target graph
-        ExplainIter ret = new ExplainIter(this, proofContext, reificationId, subjToExplain, objToExplain, predToExplain, ctxToExplain, isExplicit, isDerivedFromSameAs, aContext, logger);
-        // access the inferencer and the repository connection from systemOptions
-        ret.infer = proofContext.inferencer;
-        ret.conn = proofContext.repositoryConnection;
-        ret.init();
+        ExplainIter ret = new ExplainIter(this, proofContext, reificationId, subjToExplain, objToExplain, predToExplain, ctxToExplain, isExplicit, isDerivedFromSameAs, explicitContext, logger);
+
         // store the task into request context
         proofContext.setAttribute(KEY_STORAGE + reificationId, ret);
 

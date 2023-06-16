@@ -24,9 +24,9 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     // evaluated within same query0
     long reificationId;
     // instance of the inference to work with
-    AbstractInferencer infer;
+    AbstractInferencer inferencer;
     // connection to the raw data to get only the AXIOM statements
-    AbstractRepositoryConnection conn;
+    AbstractRepositoryConnection repositoryConnection;
     long subjToExplain, predToExplain, objToExplain;
     boolean isExplicit = false;
     boolean isDerivedFromSameAs = false;
@@ -52,11 +52,14 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
         this.predicate = proofPlugin.explainId;
         this.logger = logger;
         this.ctxToExplain = ctxToExplain;
+        this.inferencer = proofContext.inferencer;
+        this.repositoryConnection = proofContext.repositoryConnection;
+        this.init();
     }
 
     public void init() {
         if (!isExplicit) {
-            infer.isSupported(subjToExplain, predToExplain, objToExplain, 0, 0, this);
+            inferencer.isSupported(subjToExplain, predToExplain, objToExplain, 0, 0, this);
             iter = solutions.iterator();
             if (iter.hasNext())
                 current = iter.next();
@@ -96,7 +99,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                 while (sol.hasNext()) {
                     StatementIdIterator iter = sol.next();
                     // try finding an existing explicit or in-context with same subj, pred and obj
-                    try (StatementIdIterator ctxIter = conn.getStatements(iter.subj, iter.pred, iter.obj, true, 0, proofPlugin.excludeDeletedHiddenInferred)) {
+                    try (StatementIdIterator ctxIter = repositoryConnection.getStatements(iter.subj, iter.pred, iter.obj, true, 0, proofPlugin.excludeDeletedHiddenInferred)) {
                         logger.debug(String.format("Contesti di %d %d %d", iter.subj, iter.pred, iter.obj));
                         if (ctxToExplain == -9999) { //normal proof behaviour
                             while (ctxIter.hasNext()) {
@@ -171,7 +174,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     @Override
     public AbstractRepositoryConnection getConnection() {
-        return conn;
+        return repositoryConnection;
     }
 
 }
