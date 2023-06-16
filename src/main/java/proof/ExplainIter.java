@@ -58,7 +58,13 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     }
 
     public void init() {
-        if (!isExplicit) {
+        if (isExplicit) {
+            ArrayList<long[]> arr = new ArrayList<>();
+            arr.add(new long[]{subjToExplain, predToExplain, objToExplain, aContext});
+            current = new Solution("explicit", arr);
+            currentNo = 0;
+            iter = getEmptySolutionIterator();
+        } else {
             inferencer.isSupported(subjToExplain, predToExplain, objToExplain, 0, 0, this);
             iter = solutions.iterator();
             if (iter.hasNext())
@@ -66,25 +72,21 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             if (current != null) {
                 currentNo = 0;
             }
-        } else {
-            ArrayList<long[]> arr = new ArrayList<long[]>();
-            arr.add(new long[]{subjToExplain, predToExplain, objToExplain, aContext});
-            current = new Solution("explicit", arr);
-            currentNo = 0;
-            iter = new Iterator<Solution>() {
-
-                @Override
-                public boolean hasNext() {
-                    return false;
-                }
-
-                @Override
-                public Solution next() {
-                    return null;
-                }
-
-            };
         }
+    }
+
+    private Iterator<Solution> getEmptySolutionIterator() {
+        return new Iterator<>() {
+            @Override
+            public boolean hasNext() {
+                return false;
+            }
+
+            @Override
+            public Solution next() {
+                return null;
+            }
+        };
     }
 
     @Override
