@@ -3,62 +3,47 @@ package proof
 import com.ontotext.graphdb.Config
 import com.ontotext.test.TemporaryLocalFolder
 import com.ontotext.trree.OwlimSchemaRepository
-import junit.framework.TestCase.assertEquals
+import org.eclipse.rdf4j.model.Value
+import org.eclipse.rdf4j.model.vocabulary.OWL
+import org.eclipse.rdf4j.model.vocabulary.RDFS
 import org.eclipse.rdf4j.repository.sail.SailRepository
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection
+import org.eclipse.rdf4j.rio.RDFFormat
 import org.junit.*
+import org.slf4j.LoggerFactory
+import java.io.File
 
 
-private const val RULESET = "owl-horst"
+class TestProofWithDefaults {
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
-class TestProofWithOwlHorst {
+
     @Before
     fun removeAllTriples() {
         connection.prepareUpdate(deleteAll).execute()
     }
 
     @Test
-    fun `4 antecedents for mary as subject`() {
-        connection.prepareUpdate(addMary).execute()
-        connection.prepareUpdate(registerLNameFn).execute()
-        val explainResult = connection.prepareTupleQuery(explainMaryInSubject).evaluate()
 
-        explainResult.use { result ->
-            val resultList = result.toList()
-            println("statements $resultList")
-            assertEquals("Query returns 4 statements", 4, resultList.count())
+    fun testBasicInference() { //copied from old proof
+        val fileName = object {}.javaClass.getResource("sample.trig")?.file
+        connection.add(fileName?.let { File(it) }, "http://base.uri", RDFFormat.TRIG)
+        connection.add(OWL.CLASS, RDFS.SUBCLASSOF, RDFS.CLASS)
+        connection.prepareTupleQuery(explainFood).evaluate().use { result ->
+            val ctxs = HashSet<Value>()
+            var count = 0
+            while (result.hasNext()) {
+                val bs = result.next()
+                val cB = bs.getBinding("ctx")
+                Assert.assertNotNull("Expected object to be always bound", cB)
+                Assert.assertNotNull("Expected object to be not null", cB.value)
+                ctxs.add(cB.value)
+                count++
+            }
+            Assert.assertEquals("total iterations", 12, ctxs.size.toLong())
+            Assert.assertEquals("total results", 16, count.toLong())
         }
     }
-    
-
-//    FIXME test behaves differently than query executed in workbench. No idea why
-//    @Test
-//    fun `describe Merlo`() {
-//        connection.prepareUpdate(addWine).execute()
-//        connection.prepareUpdate(registerLNameFn).execute()
-//        connection.prepareUpdate(registerStmtFn).execute()
-////        connection.prepareUpdate(registerBNodeFn).execute()
-//
-//        connection.prepareTupleQuery(registeredFns).evaluate().use {
-//            assertEquals("2 functions are registered", 2, it.count())
-//        }
-//
-//
-//        connection.prepareGraphQuery(describeMerlo).evaluate().use { result ->
-//            val resultList = result.toList()
-//            println("Describe result - $resultList")
-//            assertEquals("urn:Merlo describe has 6 results", 6, resultList.count())
-//        }
-//
-//        connection.prepareUpdate(addWine).execute()
-//
-//
-//        connection.prepareTupleQuery(explainMerlotTypeRedWine).evaluate().use { result ->
-//            val resultList = result.toList()
-//            println("Explain result - $resultList")
-//            assertEquals("Merlo rdf:type redWine has 2 antecedents", 2, resultList.count())
-//        }
-//    }
 
     companion object {
         private lateinit var repository: SailRepository
@@ -74,7 +59,7 @@ class TestProofWithOwlHorst {
             setWorkDir()
             val sailParams = mapOf(
                 "register-plugins" to proof.ProofPlugin::class.qualifiedName as String,
-                "ruleset" to RULESET,
+//                "ruleset" to RULESET,
 //                "disable-sameAs" to "false",
             )
             repository = getRepository(sailParams)

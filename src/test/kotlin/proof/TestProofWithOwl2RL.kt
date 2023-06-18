@@ -35,7 +35,6 @@ class TestProofWithOwl2RL {
                 bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
             }
         }
-
     }
 
     @Test
@@ -78,7 +77,6 @@ class TestProofWithOwl2RL {
             assertTrue("Dog subclass Mammal is antecedent", dogSubclassMammalIsAntecedent)
             assertTrue("Lassie type Dog is antecedent", lassieTypeDogIsAntecedent)
         }
-
     }
 
     @Test
@@ -137,7 +135,6 @@ class TestProofWithOwl2RL {
 
             assertTrue("John child of mary is explicit", isAntecedentExplicit)
         }
-
     }
 
     @Test
@@ -175,7 +172,9 @@ class TestProofWithOwl2RL {
     @Test
     fun `Lassie has antecedents in correct named graph`() {
         connection.prepareUpdate(insertLassieNg).execute()
-        connection.prepareTupleQuery(explain(":Lassie", "rdf:type", ":Mammal", ":G1")).evaluate().use {
+
+        val query = explain(":Lassie", "rdf:type", ":Mammal", ":G1")
+        connection.prepareTupleQuery(query).evaluate().use {
             val resultList = it.toList()
             println("antecedents - $resultList")
             assertEquals("Result has 2 antecedents", 2, resultList.count())
@@ -183,7 +182,6 @@ class TestProofWithOwl2RL {
             val isAntecedentFromG1 = resultList.any { bindingSet ->
                 bindingSet.getBinding("context").value.stringValue() == "http://www.example.com/G1"
             }
-
             assertTrue("Antecedent is in :G1", isAntecedentFromG1)
         }
 
@@ -198,8 +196,16 @@ class TestProofWithOwl2RL {
 
             assertTrue("Antecedent is in :G1", isAntecedentFromG1)
         }
+    }
 
+    @Test
+    fun `statements in default graph only have antecedents in the default graph`() {
+        connection.prepareUpdate(insertLassieNg).execute()
+        val query = explain(":Lassie", "rdf:type", ":Mammal")
 
+        connection.prepareTupleQuery(query).evaluate().use { result ->
+            assertEquals("Number of antecedents", 0, result.count())
+        }
     }
 
 
@@ -249,8 +255,5 @@ class TestProofWithOwl2RL {
             System.clearProperty("graphdb.home.work")
             Config.reset()
         }
-
     }
-
-
 }

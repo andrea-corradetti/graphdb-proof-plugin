@@ -242,3 +242,7 @@ internal fun explain(subject: String, predicate: String, `object`: String, conte
             ?ctx proof:context ?context .
         }
 """.trimIndent()
+
+internal val explainFood =
+    "PREFIX pr: <http://www.ontotext.com/proof/>\r\nPREFIX food: <http://www.w3.org/TR/2003/PR-owl-guide-20031209/food#>\r\nPREFIX onto: <http://www.ontotext.com/>\r\n\r\nselect ?ctx ?s ?p ?o ?rule ?context ?subj ?pred ?obj\r\nfrom named onto:implicit \r\nfrom named onto:explicit \r\n{\r\n#		values (?s ?p ?o) {(food:Fruit UNDEF UNDEF)} \r\n		graph ?g {?s ?p ?o} \r\n	filter(strstarts(str(?s),str(food:)))\r\n     ?ctx pr:explain (?s ?p ?o) .\r\n     ?ctx pr:rule ?rule .\r\n     ?ctx pr:subject ?subj .\r\n     ?ctx pr:predicate ?pred .\r\n     ?ctx pr:object ?obj .\r\n     ?ctx pr:context ?context .\r\n}\r\n"
+
