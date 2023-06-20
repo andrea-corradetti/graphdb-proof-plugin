@@ -1,6 +1,7 @@
 package proof;
 
 import com.ontotext.trree.StatementIdIterator;
+import com.ontotext.trree.SystemGraphs;
 import com.ontotext.trree.sdk.*;
 import com.ontotext.trree.sdk.Entities.Scope;
 import org.eclipse.rdf4j.model.IRI;
@@ -185,7 +186,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long subjToExplain = objects[0];
         long objToExplain = objects[1];
         long predToExplain = objects[2];
-        long ctxToExplain = (objects.length == 4) ? objects[3] : -9999; //FIXME placeholder context.
+        long ctxToExplain = (objects.length == 4) ? objects[3] : SystemGraphs.EXPLICIT_GRAPH.getId(); //FIXME placeholder context.
         Quad statementToExplain = new Quad(subjToExplain, objToExplain, predToExplain, ctxToExplain);
 
         boolean areObjectsBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
@@ -223,7 +224,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
             logger.debug("iter getStatements context" + iterForExplicit.context);
             isExplicit = iterForExplicit.hasNext();
             explicitContext = iterForExplicit.context;
-            isDerivedFromSameAs = 0 != (iterForExplicit.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS); // handle if explicit comes from sameAs
+            isDerivedFromSameAs = (iterForExplicit.status & StatementIdIterator.SKIP_ON_REINFER_STATEMENT_STATUS) != 0; // handle if explicit comes from sameAs
         }
         return new ExplicitStatementProps(isExplicit, explicitContext, isDerivedFromSameAs);
     }
