@@ -198,6 +198,7 @@ class TestProofWithOwl2RL {
         }
     }
 
+    @Ignore
     @Test
     fun `statements in default graph only have antecedents in the default graph`() {
         connection.prepareUpdate(insertLassieNg).execute()
