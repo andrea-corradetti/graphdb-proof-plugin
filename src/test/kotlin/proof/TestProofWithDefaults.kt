@@ -40,8 +40,8 @@ class TestProofWithDefaults {
                 ctxs.add(cB.value)
                 count++
             }
-            Assert.assertEquals("total iterations", 12, ctxs.size.toLong())
-            Assert.assertEquals("total results", 16, count.toLong())
+            Assert.assertEquals("total iterations", 12, ctxs.size)
+            Assert.assertEquals("total results", 16, count)
         }
     }
 

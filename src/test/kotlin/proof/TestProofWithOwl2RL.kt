@@ -81,9 +81,8 @@ class TestProofWithOwl2RL {
 
     @Test
     fun `Mary has child in named graph`() {
-        connection.prepareUpdate(addMary).execute()
-        val explainResult = connection.prepareTupleQuery(explainMary).evaluate()
-        explainResult.use { result ->
+        connection.prepareUpdate(addMaryNG).execute()
+        connection.prepareTupleQuery(explainMaryNg).evaluate().use { result ->
             val resultList = result.toList()
             assertEquals("Statement has exactly 2 antecedents", 2, resultList.count())
 
@@ -109,8 +108,23 @@ class TestProofWithOwl2RL {
     }
 
     @Test
-    fun `Antecedent has explicit rule`() {
+    fun `Mary has child in default graph`() {
         connection.prepareUpdate(addMary).execute()
+        connection.prepareTupleQuery(explainMary).evaluate().use { result ->
+            val resultList = result.toList()
+            assertEquals("Statement has 2 antecedents", 2, resultList.count())
+            val areAllAntecedentsExplicit = resultList.all {
+                it.getBinding("context").value.stringValue().contains("explicit")
+            }
+            assertTrue("All antecedents are explicit", areAllAntecedentsExplicit)
+        }
+    }
+
+
+
+    @Test
+    fun `Antecedent has explicit rule`() {
+        connection.prepareUpdate(addMaryNG).execute()
         val explainResult = connection.prepareTupleQuery(explainMaryExplicit).evaluate()
         explainResult.use { result ->
             val resultList = result.toList()
@@ -144,6 +158,9 @@ class TestProofWithOwl2RL {
         val explainResult = connection.prepareTupleQuery(explainMaryInSubject).evaluate()
         explainResult.use { result ->
             val resultList = result.toList()
+            println("results")
+            println(resultList.map { it.map { binding -> "${binding.name} - ${binding.value}\n" } })
+
             assertEquals("Query returns 12 statements", 12, resultList.count())
         }
     }

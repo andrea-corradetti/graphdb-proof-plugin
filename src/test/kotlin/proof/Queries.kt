@@ -42,12 +42,19 @@ internal val explainLessie = """
         }
     """.trimIndent()
 
-internal val addMary = """
+internal val addMaryNG = """
         INSERT DATA {
             <urn:childOf> owl:inverseOf <urn:hasChild> .
             graph <urn:family> {
                 <urn:John> <urn:childOf> <urn:Mary>
             }
+        }
+    """.trimIndent()
+
+internal val addMary = """
+        INSERT DATA {
+            <urn:childOf> owl:inverseOf <urn:hasChild> .
+            <urn:John> <urn:childOf> <urn:Mary>.
         }
     """.trimIndent()
 
@@ -58,6 +65,21 @@ internal val explainMary = """
         SELECT ?rule ?s ?p ?o ?context WHERE {
             VALUES (?subject ?predicate ?object) {(<urn:Mary> <urn:hasChild> <urn:John>)}
             ?ctx proof:explain (?subject ?predicate ?object) .
+            ?ctx proof:rule ?rule .
+            ?ctx proof:subject ?s .
+            ?ctx proof:predicate ?p .
+            ?ctx proof:object ?o .
+            ?ctx proof:context ?context .
+        }
+    """.trimIndent()
+
+internal val explainMaryNg = """
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX proof: <http://www.ontotext.com/proof/>
+        SELECT ?rule ?s ?p ?o ?context WHERE {
+            VALUES (?subject ?predicate ?object) {(<urn:Mary> <urn:hasChild> <urn:John>)}
+            ?ctx proof:explain (?subject ?predicate ?object <urn:family>) .
             ?ctx proof:rule ?rule .
             ?ctx proof:subject ?s .
             ?ctx proof:predicate ?p .

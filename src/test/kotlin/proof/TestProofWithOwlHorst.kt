@@ -75,7 +75,6 @@ class TestProofWithOwlHorst {
             val sailParams = mapOf(
                 "register-plugins" to proof.ProofPlugin::class.qualifiedName as String,
                 "ruleset" to RULESET,
-//                "disable-sameAs" to "false",
             )
             repository = getRepository(sailParams)
             connection = repository.connection
