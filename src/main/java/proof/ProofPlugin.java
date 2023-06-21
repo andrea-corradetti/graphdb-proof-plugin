@@ -187,7 +187,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long objToExplain = objects[1];
         long predToExplain = objects[2];
         long ctxToExplain = (objects.length == 4) ? objects[3] : SystemGraphs.EXPLICIT_GRAPH.getId(); //FIXME placeholder context.
-        Quad statementToExplain = new Quad(subjToExplain, objToExplain, predToExplain, ctxToExplain);
+        Quad statementToExplain = new Quad(subjToExplain, objToExplain, predToExplain, ctxToExplain, 0);
 
         boolean areObjectsBoundIncorrectly = subjToExplain <= 0 || predToExplain <= 0 || objToExplain <= 0;
         if (areObjectsBoundIncorrectly) {

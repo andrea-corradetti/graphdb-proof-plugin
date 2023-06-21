@@ -8,8 +8,8 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.*;
+import java.util.stream.Collectors;
 
 class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
@@ -26,7 +26,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     boolean isDerivedFromSameAs;
     long explicitContext; //FIXME possibly misguiding name
 
-    ArrayList<Solution> solutions = new ArrayList<>();
+    Set<Solution> solutions = new LinkedHashSet<>();
     Iterator<Solution> iter;
     Solution current = null;
     int currentNo = -1;
@@ -82,69 +82,81 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     }
 
     @Override
-    public boolean report(String ruleName, QueryResultIterator q) {
+    public boolean report(String ruleName, QueryResultIterator queryResultIterator) {
         logger.debug("report rule {} for {},{},{}", ruleName, statementToExplain.subject, statementToExplain.predicate, statementToExplain.object);
-        while (q.hasNext()) {
-            if (q instanceof StatementSource) {
-                StatementSource source = (StatementSource) q;
-                Iterator<StatementIdIterator> sol = source.solution();
+        List<Quad> antecedents = new ArrayList<>();
+        while (queryResultIterator.hasNext()) {
+            if (queryResultIterator instanceof StatementSource) {
+                StatementSource source = (StatementSource) queryResultIterator;
+                Iterator<StatementIdIterator> sourceSolutionIterator = source.solution();
 
-                boolean isSelfReferential = false;
-                ArrayList<long[]> antecedents = new ArrayList<>();
+                while (sourceSolutionIterator.hasNext()) {
+                    try (StatementIdIterator antecedent = sourceSolutionIterator.next()) {
+                        logger.debug("Iter default context = " + antecedent.context);
 
-                while (sol.hasNext()) {
-                    StatementIdIterator antecedent = sol.next();
-                    logger.debug("Iter default context = " + antecedent.context);
-
-                    // try finding an existing explicit or in-context with same subj, pred and obj
-                    try (StatementIdIterator ctxIter = repositoryConnection.getStatements(antecedent.subj, antecedent.pred, antecedent.obj, true, 0, ProofPlugin.excludeDeletedHiddenInferred)) {
-                        logger.debug(String.format("Contexts for %d %d %d", antecedent.subj, antecedent.pred, antecedent.obj));
-                        if (statementToExplain.context == -9999) { //normal proof behaviour
-                            while (ctxIter.hasNext()) {
-                                logger.debug(String.valueOf(ctxIter.context));
-                                if (ctxIter.context != SystemGraphs.EXPLICIT_GRAPH.getId()) {
-                                    antecedent.context = ctxIter.context;
-                                    antecedent.status = ctxIter.status;
-                                    break;
-                                }
-                                ctxIter.next();
-                            }
-                        } else {
-                            while (ctxIter.hasNext()) {
-                                logger.debug(String.valueOf(ctxIter.context));
-                                if (ctxIter.context == statementToExplain.context) {
-                                    antecedent.context = ctxIter.context;
-                                    antecedent.status = ctxIter.status;
-                                    break;
-                                }
-                                ctxIter.next();
-                            }
+                        boolean isSelfReferential = (antecedent.subj == statementToExplain.subject && antecedent.pred == statementToExplain.predicate && antecedent.obj == statementToExplain.object);
+                        if (isSelfReferential) {
+                            logger.debug("not added - self referential");
+                            continue;
                         }
-                    }
 
-                    if (antecedent.subj == statementToExplain.subject && antecedent.pred == statementToExplain.predicate && antecedent.obj == statementToExplain.object) {
-                        isSelfReferential = true;
-                        break;
-                    }
-                    antecedents.add(new long[]{antecedent.subj, antecedent.pred, antecedent.obj, antecedent.context, antecedent.status});
-                }
+                        List<Quad> antecedentsWithAllContexts = getAntecedentWithAllContexts(antecedent);
 
-                Solution solution = new Solution(ruleName, antecedents);
-                logger.debug("isSelfReferential {} for solution {}", isSelfReferential, solution);
-                if (!isSelfReferential) {
-                    if (!solutions.contains(solution)) {
-                        logger.debug("added");
-                        solutions.add(solution);
-                    } else {
-                        logger.debug("already added");
+                        boolean statementIsInSameContext = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == statementToExplain.context);
+                        if (statementIsInSameContext) {
+                            logger.debug("statement is same context {}", statementToExplain.context);
+                            Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, statementToExplain.context, antecedent.status);
+                            antecedents.add(toAdd);
+                        }
+
+                        boolean statementIsInDefaultGraph = !statementIsInSameContext && antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
+                        if (statementIsInDefaultGraph) {
+                            logger.debug("statement is in default graph");
+                            Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.EXPLICIT_GRAPH.getId(), antecedent.status);
+                            antecedents.add(toAdd);
+                        }
+
+                        boolean statementIsOnlyImplicit = !statementIsInDefaultGraph && antecedentsWithAllContexts.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+                        if (statementIsOnlyImplicit) {
+                            logger.debug("statement is only implicit");
+//                                antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
+                        }
+
+                        logger.debug("Saved antecedents " + antecedents);
                     }
-                } else {
-                    logger.debug("not added - self referential");
                 }
             }
-            q.next();
+            queryResultIterator.next();
+
         }
+        if (antecedents.isEmpty()) {
+            return false;
+        }
+
+        Solution solution = new Solution(ruleName, antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList()));
+
+        if (!solutions.contains(solution)) {
+            logger.debug("added");
+            solutions.add(solution);
+        } else {
+            logger.debug("already added");
+        }
+
         return false;
+    }
+
+    private List<Quad> getAntecedentWithAllContexts(StatementIdIterator antecedent) {
+        ArrayList<Quad> antecedentsWithAllContexts = new ArrayList<>();
+        try (StatementIdIterator ctxIter = repositoryConnection.getStatements(antecedent.subj, antecedent.pred, antecedent.obj, true, 0, ProofPlugin.excludeDeletedHiddenInferred)) {
+            logger.debug(String.format("Contexts for %d %d %d", antecedent.subj, antecedent.pred, antecedent.obj));
+            while (ctxIter.hasNext()) {
+                antecedentsWithAllContexts.add(new Quad(ctxIter.subj, ctxIter.pred, ctxIter.obj, ctxIter.context, ctxIter.status));
+                logger.debug(String.valueOf(ctxIter.context));
+                ctxIter.next();
+            }
+            logger.debug("All contexts for antecedent" + antecedentsWithAllContexts);
+        }
+        return antecedentsWithAllContexts;
     }
 
 

@@ -84,12 +84,12 @@ class TestProofWithOwl2RL {
         connection.prepareUpdate(addMaryNG).execute()
         connection.prepareTupleQuery(explainMaryNg).evaluate().use { result ->
             val resultList = result.toList()
-            assertEquals("Statement has exactly 2 antecedents", 2, resultList.count())
-
             resultList.forEachIndexed { index, bindingSet ->
                 println("result $index")
                 bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
             }
+            assertEquals("Statement has exactly 2 antecedents", 2, resultList.count())
+
 
             val bindingsMap = mapOf(
                 "rule" to "rule_prp_inv1",

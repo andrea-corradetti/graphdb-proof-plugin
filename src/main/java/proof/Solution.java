@@ -1,12 +1,13 @@
 package proof;
 
 import java.util.ArrayList;
+import java.util.List;
 
 class Solution {
     String rule;
-    ArrayList<long[]> premises;
+    List<long[]> premises;
 
-    Solution(String rule, ArrayList<long[]> premises) {
+    Solution(String rule, List<long[]> premises) {
         this.rule = rule;
         this.premises = premises;
     }
