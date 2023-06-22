@@ -221,7 +221,13 @@ class TestProofWithOwl2RL {
         val query = explain(":Lassie", "rdf:type", ":Mammal")
 
         connection.prepareTupleQuery(query).evaluate().use { result ->
-            assertEquals("Number of antecedents", 0, result.count())
+            val resultList = result.toList()
+            resultList.forEachIndexed { index, bindingSet ->
+                println("result $index")
+                bindingSet.forEach { binding -> println("${binding.name} = ${binding.value}") }
+            }
+
+            assertEquals("Number of antecedents", 0, resultList.count())
         }
     }
 

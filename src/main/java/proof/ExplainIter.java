@@ -101,24 +101,26 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
                         List<Quad> antecedentsWithAllContexts = getAntecedentWithAllContexts(antecedent);
 
-                        boolean statementIsInSameContext = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == statementToExplain.context);
-                        if (statementIsInSameContext) {
+                        boolean isStatementInSameContext = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == statementToExplain.context);
+                        if (isStatementInSameContext) {
                             logger.debug("statement is same context {}", statementToExplain.context);
                             Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, statementToExplain.context, antecedent.status);
                             antecedents.add(toAdd);
                         }
 
-                        boolean statementIsInDefaultGraph = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
-                        if (statementIsInDefaultGraph) {
+                        boolean isStatementInDefaultGraph = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
+                        if (isStatementInDefaultGraph) {
                             logger.debug("statement is in default graph");
                             Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.EXPLICIT_GRAPH.getId(), antecedent.status);
                             antecedents.add(toAdd);
                         }
 
-                        boolean statementIsOnlyImplicit = !statementIsInSameContext && !statementIsInDefaultGraph && antecedentsWithAllContexts.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
-                        if (statementIsOnlyImplicit) {
+                        boolean isStatementOutOfScope = !isStatementInSameContext && !isStatementInDefaultGraph;
+
+                        boolean isStatementOnlyImplicit = isStatementOutOfScope && antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+                        if (isStatementOnlyImplicit) {
                             logger.debug("statement is only implicit");
-//                                antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
+                            antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
                         }
 
                         logger.debug("Saved antecedents " + antecedents);
@@ -126,21 +128,25 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                 }
             }
             queryResultIterator.next();
-
-        }
-        if (antecedents.isEmpty()) {
-            return false;
         }
 
-        Solution solution = new Solution(ruleName, antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList()));
-
-        if (!solutions.contains(solution)) {
-            logger.debug("added");
-            solutions.add(solution);
-        } else {
-            logger.debug("already added");
+        boolean areAllAntecedentsImplicit = antecedents.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+        if (areAllAntecedentsImplicit) {
+            logger.debug("All antecedents are implicit");
+            antecedents = new ArrayList<>();
         }
 
+        if (!antecedents.isEmpty()) {
+            List<long[]> antecedentsAsArrays = antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList());
+            Solution solution = new Solution(ruleName, antecedentsAsArrays);
+
+            if (!solutions.contains(solution)) {
+                logger.debug("added");
+                solutions.add(solution);
+            } else {
+                logger.debug("already added");
+            }
+        }
         return false;
     }
 
