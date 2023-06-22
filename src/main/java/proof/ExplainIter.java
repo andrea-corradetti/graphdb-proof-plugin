@@ -14,12 +14,9 @@ import java.util.stream.Collectors;
 class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     private final Logger logger;
-
+    private final Quad statementToExplain;
     AbstractInferencer inferencer;
     AbstractRepositoryConnection repositoryConnection; // connection to the raw data to get only the AXIOM statements ???
-
-    private final Quad statementToExplain;
-
     long reificationId; //id of bnode representing the explain operation
 
     boolean isExplicit;
@@ -58,7 +55,9 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
         } else {
             inferencer.isSupported(statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, 0, 0, this);
             iter = solutions.iterator();
-            if (iter.hasNext()) current = iter.next();
+            if (iter.hasNext()) {
+                current = iter.next();
+            }
             if (current != null) {
                 currentNo = 0;
             }
@@ -109,14 +108,14 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                             antecedents.add(toAdd);
                         }
 
-                        boolean statementIsInDefaultGraph = !statementIsInSameContext && antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
+                        boolean statementIsInDefaultGraph = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
                         if (statementIsInDefaultGraph) {
                             logger.debug("statement is in default graph");
                             Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.EXPLICIT_GRAPH.getId(), antecedent.status);
                             antecedents.add(toAdd);
                         }
 
-                        boolean statementIsOnlyImplicit = !statementIsInDefaultGraph && antecedentsWithAllContexts.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+                        boolean statementIsOnlyImplicit = !statementIsInSameContext && !statementIsInDefaultGraph && antecedentsWithAllContexts.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
                         if (statementIsOnlyImplicit) {
                             logger.debug("statement is only implicit");
 //                                antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
@@ -176,8 +175,11 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             } else {
                 values = null;
                 currentNo = 0;
-                if (iter.hasNext()) current = iter.next();
-                else current = null;
+                if (iter.hasNext()) {
+                    current = iter.next();
+                } else {
+                    current = null;
+                }
             }
         }
         return false;
