@@ -36,8 +36,7 @@ import static org.eclipse.rdf4j.model.util.Values.*;
  * @author damyan.ognyanov
  */
 public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPlugin, Preprocessor, PatternInterpreter, ListPatternInterpreter {
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
-
+    public static final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
     private static final String NAMESPACE = "http://www.ontotext.com/proof/";
     private static final IRI EXPLAIN_URI = iri(NAMESPACE + "explain");
     private static final IRI RULE_URI = iri(NAMESPACE + "rule");
@@ -45,12 +44,12 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     private static final IRI PRED_URI = iri(NAMESPACE + "predicate");
     private static final IRI OBJ_URI = iri(NAMESPACE + "object");
     private static final IRI CONTEXT_URI = iri(NAMESPACE + "context");
-
     private static final String KEY_STORAGE = "storage";
     private static final int UNBOUND = 0;
 
-    public static final int excludeDeletedHiddenInferred = StatementIdIterator.DELETED_STATEMENT_STATUS | StatementIdIterator.SKIP_ON_BROWSE_STATEMENT_STATUS | StatementIdIterator.INFERRED_STATEMENT_STATUS;
+    public static boolean isSharedKnowledgeInDefaultGraph = true;
 
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private long explainId;
     private long ruleId;
     private long subjId;
@@ -77,7 +76,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         }
 
         ExplainIter explainIter = (ExplainIter) proofContext.getAttribute(KEY_STORAGE + subject);
-        if (explainIter == null || (explainIter.current == null)) {
+        if (explainIter == null || (explainIter.currentSolution == null)) {
             return StatementIterator.EMPTY;
         }
 
@@ -88,7 +87,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
     private StatementIterator getStatementIterator(long predicate, long object, PluginConnection pluginConnection, ExplainIter explainIter) {
         // bind the value of the predicate from the current solution as object of the triple pattern
         if (predicate == ruleId) {
-            long rule = pluginConnection.getEntities().put(literal(explainIter.current.rule), Scope.REQUEST);
+            long rule = pluginConnection.getEntities().put(literal(explainIter.currentSolution.rule), Scope.REQUEST);
             return StatementIterator.create(explainIter.reificationId, ruleId, rule, 0);
         } else if (predicate == subjId) {
             if (object != UNBOUND && object != explainIter.values[0]) return StatementIterator.EMPTY;

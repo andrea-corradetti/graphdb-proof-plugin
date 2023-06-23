@@ -25,8 +25,8 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     Set<Solution> solutions = new LinkedHashSet<>();
     Iterator<Solution> iter;
-    Solution current = null;
-    int currentNo = -1;
+    Solution currentSolution = null;
+    int currentPremiseNo = -1;
     long[] values = null;
 
     public ExplainIter(ProofContext proofContext, long reificationId, long explainId, Quad statementToExplain, ExplicitStatementProps explicitStatementProps) {
@@ -47,19 +47,18 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     public void init() {
         if (isExplicit) {
-            ArrayList<long[]> arr = new ArrayList<>();
-            arr.add(new long[]{statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, explicitContext});
-            current = new Solution("explicit", arr);
-            currentNo = 0;
+            long[] antecedent = {statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, explicitContext};
+            currentSolution = new Solution("explicit", List.of(antecedent));
+            currentPremiseNo = 0;
             iter = getEmptySolutionIterator();
         } else {
             inferencer.isSupported(statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, 0, 0, this);
             iter = solutions.iterator();
             if (iter.hasNext()) {
-                current = iter.next();
+                currentSolution = iter.next();
             }
-            if (current != null) {
-                currentNo = 0;
+            if (currentSolution != null) {
+                currentPremiseNo = 0;
             }
         }
     }
@@ -83,44 +82,48 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
     @Override
     public boolean report(String ruleName, QueryResultIterator queryResultIterator) {
         logger.debug("report rule {} for {},{},{}", ruleName, statementToExplain.subject, statementToExplain.predicate, statementToExplain.object);
-        List<Quad> antecedents = new ArrayList<>();
+        Set<Quad> antecedents = new HashSet<>();
         while (queryResultIterator.hasNext()) {
-            if (queryResultIterator instanceof StatementSource) {
-                StatementSource source = (StatementSource) queryResultIterator;
+            if (queryResultIterator instanceof StatementSource source) {
                 Iterator<StatementIdIterator> sourceSolutionIterator = source.solution();
 
                 while (sourceSolutionIterator.hasNext()) {
                     try (StatementIdIterator antecedent = sourceSolutionIterator.next()) {
-                        logger.debug("Iter default context = " + antecedent.context);
-
                         boolean isSelfReferential = (antecedent.subj == statementToExplain.subject && antecedent.pred == statementToExplain.predicate && antecedent.obj == statementToExplain.object);
                         if (isSelfReferential) {
-                            logger.debug("not added - self referential");
+                            logger.debug("skipped - self referential");
                             continue;
                         }
 
-                        List<Quad> antecedentsWithAllContexts = getAntecedentWithAllContexts(antecedent);
+                        logger.debug("Iter default context = " + antecedent.context);
 
-                        boolean isStatementInSameContext = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == statementToExplain.context);
+                        Set<Quad> antecedentWithAllContexts = getAntecedentWithAllContexts(antecedent);
+                        logger.debug("antecedents with all contexts " + antecedentWithAllContexts);
+
+                        boolean isStatementInSameContext = antecedentWithAllContexts.stream().anyMatch(quad -> quad.context == statementToExplain.context);
                         if (isStatementInSameContext) {
                             logger.debug("statement is same context {}", statementToExplain.context);
-                            Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, statementToExplain.context, antecedent.status);
-                            antecedents.add(toAdd);
+                            antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, statementToExplain.context, antecedent.status));
                         }
 
-                        boolean isStatementInDefaultGraph = antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
-                        if (isStatementInDefaultGraph) {
+                        boolean isStatementInDefaultGraph = !isStatementInSameContext && antecedentWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.EXPLICIT_GRAPH.getId());
+                        if (ProofPlugin.isSharedKnowledgeInDefaultGraph && isStatementInDefaultGraph) {
                             logger.debug("statement is in default graph");
-                            Quad toAdd = new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.EXPLICIT_GRAPH.getId(), antecedent.status);
-                            antecedents.add(toAdd);
+                            antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.EXPLICIT_GRAPH.getId(), antecedent.status));
                         }
 
-                        boolean isStatementOutOfScope = !isStatementInSameContext && !isStatementInDefaultGraph;
+                        boolean isStatementInScope = isStatementInSameContext || (ProofPlugin.isSharedKnowledgeInDefaultGraph && isStatementInDefaultGraph);
 
-                        boolean isStatementOnlyImplicit = isStatementOutOfScope && antecedentsWithAllContexts.stream().anyMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+                        boolean isStatementOnlyImplicit = !isStatementInScope && antecedentWithAllContexts.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
                         if (isStatementOnlyImplicit) {
                             logger.debug("statement is only implicit");
                             antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
+                        }
+
+
+                        if (!isStatementInScope && !isStatementOnlyImplicit) {
+                            logger.debug("statement {},{},{} is out of scope", antecedent.subj, antecedent.pred, antecedent.obj);
+                            return false;
                         }
 
                         logger.debug("Saved antecedents " + antecedents);
@@ -133,25 +136,23 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
         boolean areAllAntecedentsImplicit = antecedents.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
         if (areAllAntecedentsImplicit) {
             logger.debug("All antecedents are implicit");
-            antecedents = new ArrayList<>();
+            antecedents = new HashSet<>();
         }
+
 
         if (!antecedents.isEmpty()) {
             List<long[]> antecedentsAsArrays = antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList());
             Solution solution = new Solution(ruleName, antecedentsAsArrays);
 
-            if (!solutions.contains(solution)) {
-                logger.debug("added");
-                solutions.add(solution);
-            } else {
-                logger.debug("already added");
-            }
+            boolean added = solutions.add(solution);
+            logger.debug(added ? "added" : "already added");
         }
         return false;
     }
 
-    private List<Quad> getAntecedentWithAllContexts(StatementIdIterator antecedent) {
-        ArrayList<Quad> antecedentsWithAllContexts = new ArrayList<>();
+    private Set<Quad> getAntecedentWithAllContexts(StatementIdIterator antecedent) {
+        Set<Quad> antecedentsWithAllContexts = new HashSet<>();
+        antecedentsWithAllContexts.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, antecedent.context, antecedent.status));
         try (StatementIdIterator ctxIter = repositoryConnection.getStatements(antecedent.subj, antecedent.pred, antecedent.obj, true, 0, ProofPlugin.excludeDeletedHiddenInferred)) {
             logger.debug(String.format("Contexts for %d %d %d", antecedent.subj, antecedent.pred, antecedent.obj));
             while (ctxIter.hasNext()) {
@@ -167,26 +168,22 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
 
     @Override
     public void close() {
-        current = null;
+        currentSolution = null;
         solutions = null;
     }
 
+
     @Override
     public boolean next() {
-        while (current != null) {
-            if (currentNo < current.premises.size()) {
-                values = current.premises.get(currentNo);
-                currentNo++;
+        while (currentSolution != null) {
+            if (currentPremiseNo < currentSolution.premises.size()) {
+                values = currentSolution.premises.get(currentPremiseNo++);
                 return true;
-            } else {
-                values = null;
-                currentNo = 0;
-                if (iter.hasNext()) {
-                    current = iter.next();
-                } else {
-                    current = null;
-                }
             }
+
+            values = null;
+            currentPremiseNo = 0;
+            currentSolution = iter.hasNext() ? iter.next() : null;
         }
         return false;
     }
