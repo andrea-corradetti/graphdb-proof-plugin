@@ -6,6 +6,7 @@ plugins {
     application
 }
 
+
 group = "org.example"
 version = "1.0-SNAPSHOT"
 
@@ -39,6 +40,12 @@ tasks.test {
 
 kotlin {
     jvmToolchain(11)
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(19))
+    }
 }
 
 application {
