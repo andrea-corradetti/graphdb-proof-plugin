@@ -172,7 +172,6 @@ class TestProofWithOwl2RL {
         connection.prepareUpdate(registerStmtFn).execute()
         connection.prepareUpdate(registerBNodeFn).execute()
 
-
         connection.prepareGraphQuery(describeMerlo).evaluate().use { result ->
             val resultList = result.toList()
             println("Describe result - $resultList")
@@ -193,7 +192,7 @@ class TestProofWithOwl2RL {
         val query = explain(":Lassie", "rdf:type", ":Mammal", ":G1")
         connection.prepareTupleQuery(query).evaluate().use {
             val resultList = it.toList()
-            println("antecedents - $resultList")
+            println("results - $resultList")
             assertEquals("Result has 2 antecedents", 2, resultList.count())
 
             val isAntecedentFromG1 = resultList.any { bindingSet ->
@@ -204,7 +203,7 @@ class TestProofWithOwl2RL {
 
         connection.prepareTupleQuery(explain(":Lassie", "rdf:type", ":Mammal", ":G2")).evaluate().use {
             val resultList = it.toList()
-            println("antecedents - $resultList")
+            println("results - $resultList")
             assertEquals("Result has 2 antecedents", 2, resultList.count())
 
             val isAntecedentFromG1 = resultList.any { bindingSet ->

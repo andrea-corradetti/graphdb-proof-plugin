@@ -25,7 +25,7 @@ class TestProofWithOwlHorst {
 
         explainResult.use { result ->
             val resultList = result.toList()
-            println("statements $resultList")
+            println("results $resultList")
             assertEquals("Query returns 4 statements", 4, resultList.count())
         }
     }
