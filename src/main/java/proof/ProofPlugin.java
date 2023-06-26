@@ -127,7 +127,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
     @Override
     public String getName() {
-        return "proof-from-source";
+        return "proof-situated";
     }
 
     /**

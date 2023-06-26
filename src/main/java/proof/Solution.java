@@ -23,30 +23,20 @@ class Solution {
     }
 
     @Override
-    public boolean equals(Object oObj) {
-        if (!(oObj instanceof Solution))
-            return false;
-        Solution other = (Solution) oObj;
-        if (other == this)
-            return true;
-        if (!other.rule.equals(this.rule))
-            return false;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
 
-        if (other.premises.size() != this.premises.size())
-            return false;
+        Solution solution = (Solution) o;
 
-        //crosscheck
-        for (long[] p : this.premises) {
-            boolean exists = false;
-            for (long[] o : other.premises) {
-                if (o[0] == p[0] && o[1] == p[1] && o[2] == p[2] && o[3] == p[3] && o[4] == p[4]) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists)
-                return false;
-        }
-        return true;
+        if (!rule.equals(solution.rule)) return false;
+        return premises.equals(solution.premises);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = rule.hashCode();
+        result = 31 * result + premises.hashCode();
+        return result;
     }
 }
