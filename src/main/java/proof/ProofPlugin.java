@@ -127,7 +127,7 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
 
     @Override
     public String getName() {
-        return "proof-from-source";
+        return "proof-situated";
     }
 
     /**
@@ -203,14 +203,14 @@ public class ProofPlugin extends PluginBase implements StatelessPlugin, SystemPl
         long reificationId = pluginConnection.getEntities().put(bnode(), Scope.REQUEST);
 
         // create a Task instance and pass the iterator of the statements from the target graph
-        ExplainIter ret = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, explicitStatementProps);
+        ExplainIter explainIter = new ExplainIter(proofContext, reificationId, explainId, statementToExplain, explicitStatementProps);
 
         // store the task into request context
-        proofContext.setAttribute(KEY_STORAGE + reificationId, ret);
+        proofContext.setAttribute(KEY_STORAGE + reificationId, explainIter);
 
         // return the newly created task instance (it is a valid StatementIterator that could be reevaluated until all solutions are
         // generated)
-        return ret;
+        return explainIter;
     }
 
     @NotNull

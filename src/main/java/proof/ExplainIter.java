@@ -52,7 +52,7 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             currentPremiseNo = 0;
             iter = getEmptySolutionIterator();
         } else {
-            inferencer.isSupported(statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, 0, 0, this);
+            inferencer.isSupported(statementToExplain.subject, statementToExplain.predicate, statementToExplain.object, 0, 0, this); //this method has a side effect that prompts the overridden report() method to populate our solution with antecedents. The strange this reference does exactly that. Sorry, I don't make the rules. No idea what the fourth parameter does. Good luck
             iter = solutions.iterator();
             if (iter.hasNext()) {
                 currentSolution = iter.next();
@@ -78,6 +78,8 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             }
         };
     }
+
+
 
     @Override
     public boolean report(String ruleName, QueryResultIterator queryResultIterator) {
@@ -120,12 +122,10 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
                             antecedents.add(new Quad(antecedent.subj, antecedent.pred, antecedent.obj, SystemGraphs.IMPLICIT_GRAPH.getId(), antecedent.status));
                         }
 
-
                         if (!isStatementInScope && !isStatementOnlyImplicit) {
                             logger.debug("statement {},{},{} is out of scope", antecedent.subj, antecedent.pred, antecedent.obj);
                             return false;
                         }
-
                         logger.debug("Saved antecedents " + antecedents);
                     }
                 }
@@ -133,20 +133,16 @@ class ExplainIter extends StatementIterator implements ReportSupportedSolution {
             queryResultIterator.next();
         }
 
-        boolean areAllAntecedentsImplicit = antecedents.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
-        if (areAllAntecedentsImplicit) {
-            logger.debug("All antecedents are implicit");
-            antecedents = new HashSet<>();
-        }
+//        boolean areAllAntecedentsImplicit = antecedents.stream().allMatch(quad -> quad.context == SystemGraphs.IMPLICIT_GRAPH.getId());
+//        if (areAllAntecedentsImplicit) {
+//            logger.debug("All antecedents are implicit");
+//            return false;
+//        }
 
-
-        if (!antecedents.isEmpty()) {
-            List<long[]> antecedentsAsArrays = antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList());
-            Solution solution = new Solution(ruleName, antecedentsAsArrays);
-
-            boolean added = solutions.add(solution);
-            logger.debug(added ? "added" : "already added");
-        }
+        List<long[]> antecedentsAsArrays = antecedents.stream().map(quad -> new long[]{quad.subject, quad.predicate, quad.object, quad.context}).collect(Collectors.toList());
+        Solution solution = new Solution(ruleName, antecedentsAsArrays);
+        boolean added = solutions.add(solution);
+        logger.debug(added ? "added" : "already added");
         return false;
     }
 
